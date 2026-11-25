@@ -51,4 +51,28 @@ struct Rect {
 
 namespace Layout {
     constexpr Rect MAIN(CONTENT_X, MAIN_Y, CONTENT_W, MAIN_H);
+    constexpr int CARD_GAP = 3;         // space between cards on the S1
 }
+
+// How a device arranges the dashboard on its display: where the header, the page
+// and the footer go, and how much space separates things. The defaults are the S1.
+struct Chrome {
+    int width = Layout::SCREEN_WIDTH;     // area the dashboard occupies, from the top-left
+    int height = Layout::SCREEN_HEIGHT;
+    bool framed = true;                   // rounded frame around everything, bars as flat strips;
+                                          // otherwise no frame and the bars are drawn as cards
+    int margin = Layout::INSET;           // display edge to content
+    int barGap = 2;                       // header and footer to the page area
+    int cardGap = Layout::CARD_GAP;       // between cards on a page
+    
+    constexpr Rect header() const {
+        return Rect(margin, margin, width - 2 * margin, Layout::HEADER_HEIGHT);
+    }
+    constexpr Rect footer() const {
+        return Rect(margin, height - margin - Layout::FOOTER_HEIGHT, width - 2 * margin, Layout::FOOTER_HEIGHT);
+    }
+    constexpr Rect page() const {
+        int top = header().bottom() + barGap;
+        return Rect(margin, top, width - 2 * margin, footer().y - barGap - top);
+    }
+};

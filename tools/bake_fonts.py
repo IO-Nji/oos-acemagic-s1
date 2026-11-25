@@ -11,15 +11,19 @@ import sys
 from pathlib import Path
 from PIL import ImageFont
 
-# role, weight, pixel size at scale 1. Order matches the Font enum.
+# role and pixel size at scale 1. Order matches the Font enum.
 FONTS = [
-    ("Small", "SemiBold", 10),
-    ("Title", "Bold", 10),
-    ("Large", "Bold", 18),
+    ("Small", 10),
+    ("Title", 10),
+    ("Large", 18),
 ]
-# Display scales to bake, in percent. 100 is the 320x170 S1 panel; 150 fits the same
-# layout on a 480-pixel-wide display.
-SCALES = [100, 150]
+# Display scales to bake, in percent, with the weight of each role. 100 is the 320x170
+# S1 panel. 150 fits the same layout on a 480-pixel-wide display; those are small SPI
+# panels with soft pixels and little contrast, so its weights are a step heavier.
+SCALES = {
+    100: ("SemiBold", "Bold", "Bold"),
+    150: ("Bold", "ExtraBold", "ExtraBold"),
+}
 FIRST, LAST = 0x20, 0x7E
 
 
@@ -57,9 +61,9 @@ def main():
         "",
     ]
     sets = []
-    for scale in SCALES:
+    for scale, weights in SCALES.items():
         names = []
-        for role, weight, base in FONTS:
+        for (role, base), weight in zip(FONTS, weights):
             size = round(base * scale / 100)
             cap, digit, glyphs, data = bake(src / f"Orbitron-{weight}.ttf", size)
             name = f"orbitron{role}{scale}"

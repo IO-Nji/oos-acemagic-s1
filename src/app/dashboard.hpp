@@ -8,12 +8,13 @@
 #include <chrono>
 #include <memory>
 
-// The drawing surface of a device, in layout units. The dashboard frame occupies the
-// top-left 320x170 units; a device with a taller surface uses the rest itself.
+// The drawing surface of a device, in layout units, and how the dashboard is arranged
+// on it. A device with a surface taller than the dashboard uses the rest itself.
 struct DisplayProfile {
     int width = Layout::SCREEN_WIDTH;
     int height = Layout::SCREEN_HEIGHT;
     UiScale scale;
+    Chrome chrome;
 };
 
 // Everything a device program needs apart from its hardware: data providers,
@@ -24,7 +25,7 @@ public:
         : providers_(config),
           fb_(display.width, display.height, display.scale),
           health_(std::make_shared<Health>()),
-          screens_(fb_, health_) {
+          screens_(fb_, health_, display.chrome) {
         addPages(screens_, config, providers_, health_);
         screens_.setPageInterval(std::chrono::seconds(config.pageIntervalSec));
     }

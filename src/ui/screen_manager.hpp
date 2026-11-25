@@ -36,11 +36,28 @@ public:
     
     const std::string& title() const { return title_; }
     
+    // Space between cards, set by the device's layout
+    void setCardGap(int gap) { cardGap_ = gap; }
+    
 protected:
     std::string title_;
+    int cardGap_ = Layout::CARD_GAP;
+    
+    int cardGap() const { return cardGap_; }
+    
+    // Pages are designed for the S1's page area. On a taller one, a row designed
+    // designH high grows in proportion...
+    int rowHeight(int designH, const Rect& area) const {
+        return designH * (area.h - cardGap_) / (Layout::MAIN_H - Layout::CARD_GAP);
+    }
+    
+    // ...and a card's content, designed for a card designH high, stays centred in it.
+    // Returns the y to lay the content out from.
+    static int contentTop(const Rect& card, int designH) {
+        return card.y + (card.h - designH) / 2;
+    }
     
     // Shared metrics so every page uses the same rhythm
-    static constexpr int CARD_GAP = 3;      // space between cards
     static constexpr int CARD_PAD = 6;      // card edge to content, horizontal
     static constexpr int CARD_RADIUS = 3;
     static constexpr int DOT_RADIUS = 3;
@@ -142,10 +159,13 @@ protected:
 class ScreenManager {
 public:
     // health is shared with whoever evaluates it; the footer shows its summary
-    ScreenManager(Framebuffer& fb, std::shared_ptr<const Health> health)
-        : fb_(fb), health_(std::move(health)) {}
+    ScreenManager(Framebuffer& fb, std::shared_ptr<const Health> health, const Chrome& chrome = Chrome())
+        : fb_(fb), health_(std::move(health)), chrome_(chrome) {}
     
-    void addPage(std::shared_ptr<ScreenBase> page) { pages_.push_back(std::move(page)); }
+    void addPage(std::shared_ptr<ScreenBase> page) {
+        page->setCardGap(chrome_.cardGap);
+        pages_.push_back(std::move(page));
+    }
     size_t pageCount() const { return pages_.size(); }
     
     // Time each page stays up; 0 disables rotation
@@ -179,8 +199,12 @@ public:
     
     void render() {
         fb_.clear(Theme::BG);
-        fb_.drawRoundedRect(Layout::BORDER_X, Layout::BORDER_Y, Layout::BORDER_W, Layout::BORDER_H,
-                            Layout::BORDER_RADIUS, Theme::BORDER);
+        if (chrome_.framed) {
+            fb_.drawRoundedRect(Layout::OUTER_PADDING, Layout::OUTER_PADDING,
+                                chrome_.width - 2 * Layout::OUTER_PADDING,
+                                chrome_.height - 2 * Layout::OUTER_PADDING,
+                                Layout::BORDER_RADIUS, Theme::BORDER);
+        }
         if (pages_.empty()) return;
         
         auto now = std::chrono::steady_clock::now();
@@ -189,7 +213,7 @@ public:
             lastSwitch_ = now;
         }
         
-        pages_[current_]->render(fb_, Layout::MAIN);
+        pages_[current_]->render(fb_, chrome_.page());
         drawHeader(pages_[current_]->title());
         drawFooter();
     }
@@ -197,6 +221,7 @@ public:
 private:
     Framebuffer& fb_;
     std::shared_ptr<const Health> health_;
+    Chrome chrome_;
     std::vector<std::shared_ptr<ScreenBase>> pages_;
     size_t current_ = 0;
     std::chrono::milliseconds interval_{5000};
@@ -208,22 +233,32 @@ private:
     static constexpr int BAR_PAD = 5;
     static constexpr int PAGE_DOT_SPACING = 8;
     
+    // Background of the header or footer: a flat strip inside the frame, or a card
+    void drawBar(const Rect& r) {
+        if (chrome_.framed) {
+            fb_.fillRect(r.x, r.y, r.w, r.h, Theme::SURFACE);
+        } else {
+            fb_.fillRoundedRect(r.x, r.y, r.w, r.h, 3, Theme::SURFACE);
+            fb_.drawRoundedRect(r.x, r.y, r.w, r.h, 3, Theme::CARD_BORDER);
+        }
+    }
+    
     void drawHeader(const std::string& title) {
-        const int x = Layout::CONTENT_X, w = Layout::CONTENT_W;
-        fb_.fillRect(x, Layout::HEADER_Y, w, Layout::HEADER_HEIGHT, Theme::SURFACE);
-        fb_.drawText(x + BAR_PAD, Layout::HEADER_Y + BAR_TEXT_Y, title, Theme::TITLE, Font::Title);
-        fb_.drawTextSteady(x + w - BAR_PAD, Layout::HEADER_Y + BAR_TEXT_Y, clockText(), Theme::CLOCK);
-        fb_.drawHLine(x, Layout::HEADER_DIVIDER_Y, w, Theme::DIVIDER);
+        const Rect r = chrome_.header();
+        drawBar(r);
+        fb_.drawText(r.x + BAR_PAD, r.y + BAR_TEXT_Y, title, Theme::TITLE, Font::Title);
+        fb_.drawTextSteady(r.right() - BAR_PAD, r.y + BAR_TEXT_Y, clockText(), Theme::CLOCK);
+        if (chrome_.framed) fb_.drawHLine(r.x, r.bottom(), r.w, Theme::DIVIDER);
     }
     
     void drawFooter() {
-        const int x = Layout::CONTENT_X, w = Layout::CONTENT_W;
-        const int midY = Layout::FOOTER_Y + Layout::FOOTER_HEIGHT / 2;
-        fb_.drawHLine(x, Layout::FOOTER_DIVIDER_Y, w, Theme::DIVIDER);
-        fb_.fillRect(x, Layout::FOOTER_Y, w, Layout::FOOTER_HEIGHT, Theme::SURFACE);
+        const Rect r = chrome_.footer();
+        const int midY = r.y + r.h / 2;
+        if (chrome_.framed) fb_.drawHLine(r.x, r.y - 1, r.w, Theme::DIVIDER);
+        drawBar(r);
         
         // Page indicator on the right: one dot per page, current page highlighted
-        int dotsLeft = x + w - BAR_PAD;
+        int dotsLeft = r.right() - BAR_PAD;
         if (pages_.size() > 1) {
             dotsLeft -= 2 + static_cast<int>(pages_.size() - 1) * PAGE_DOT_SPACING;
             for (size_t i = 0; i < pages_.size(); i++) {
@@ -238,10 +273,10 @@ private:
         bool ok = health_->level == Health::Level::Ok;
         uint16_t color = ui::levelColor(health_->level);
         bool lit = !timeOverride_.empty() || std::time(nullptr) % 2 == 0;
-        fb_.fillCircle(x + BAR_PAD + 3, midY, 3, lit ? color : Theme::TRACK);
+        fb_.fillCircle(r.x + BAR_PAD + 3, midY, 3, lit ? color : Theme::TRACK);
         
-        int textX = x + BAR_PAD + 11;
-        fb_.drawText(textX, Layout::FOOTER_Y + BAR_TEXT_Y,
+        int textX = r.x + BAR_PAD + 11;
+        fb_.drawText(textX, r.y + BAR_TEXT_Y,
                      fb_.fitText(health_->summary(), dotsLeft - textX), ok ? Theme::TEXT_LABEL : color);
     }
     

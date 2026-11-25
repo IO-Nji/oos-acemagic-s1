@@ -36,15 +36,16 @@ public:
         const auto data = provider_->data();
         const SecondGauge second = secondGauge(data);
         
-        Rect row1(area.x, area.y, area.w, ROW1_H);
-        Rect row2(area.x, area.y + ROW1_H + CARD_GAP, area.w, area.h - ROW1_H - CARD_GAP);
+        const int row1H = rowHeight(ROW1_H, area);
+        Rect row1(area.x, area.y, area.w, row1H);
+        Rect row2(area.x, area.y + row1H + cardGap(), area.w, area.h - row1H - cardGap());
         
-        renderTempCard(fb, row1.column(0, 2, CARD_GAP), "CPU", data.cpuTempC, cpuHistory_);
-        renderTempCard(fb, row1.column(1, 2, CARD_GAP), second.label, second.temp, secondHistory_);
+        renderTempCard(fb, row1.column(0, 2, cardGap()), "CPU", data.cpuTempC, cpuHistory_);
+        renderTempCard(fb, row1.column(1, 2, cardGap()), second.label, second.temp, secondHistory_);
         
-        renderFansCard(fb, row2.column(0, 3, CARD_GAP), data);
-        renderPowerCard(fb, row2.column(1, 3, CARD_GAP), data);
-        renderTempListCard(fb, row2.column(2, 3, CARD_GAP), data, second.isSsd);
+        renderFansCard(fb, row2.column(0, 3, cardGap()), data);
+        renderPowerCard(fb, row2.column(1, 3, cardGap()), data);
+        renderTempListCard(fb, row2.column(2, 3, cardGap()), data, second.isSsd);
     }
     
 private:
@@ -69,11 +70,12 @@ private:
     void renderTempCard(Framebuffer& fb, const Rect& r, const std::string& label,
                         float temp, const std::vector<float>& history) {
         drawCard(fb, r);
+        const int top = contentTop(r, ROW1_H);
         int x = r.x + CARD_PAD;
-        drawSectionTitle(fb, x, r.y + 5, label);
+        drawSectionTitle(fb, x, top + 5, label);
         
         int cx = x + GAUGE_R;
-        int cy = r.y + 34;
+        int cy = top + 34;
         
         if (temp <= 0) {
             fb.drawRingGauge(cx, cy, GAUGE_R, GAUGE_R - 4, 0, Theme::TRACK, Theme::TRACK);

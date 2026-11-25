@@ -38,9 +38,9 @@ public:
     void render(Framebuffer& fb, const Rect& area) override {
         const auto data = provider_->data();
         
-        int leftW = (area.w - CARD_GAP) * LEFT_PCT / 100;
+        int leftW = (area.w - cardGap()) * LEFT_PCT / 100;
         Rect left(area.x, area.y, leftW, area.h);
-        Rect right(area.x + leftW + CARD_GAP, area.y, area.w - leftW - CARD_GAP, area.h);
+        Rect right(area.x + leftW + cardGap(), area.y, area.w - leftW - cardGap(), area.h);
         
         renderInterfaceCard(fb, left, data);
         renderThroughputCard(fb, right, data);

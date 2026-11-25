@@ -12,7 +12,8 @@
 //=============================================================================
 class SystemScreen : public ScreenBase {
 private:
-    static constexpr int ROW1_H = 60;
+    static constexpr int ROW1_H = 60;                  // on the S1; taller displays scale it
+    static constexpr int ROW2_H = Layout::MAIN_H - Layout::CARD_GAP - ROW1_H;
     static constexpr float FALLBACK_RATED_W = 15.0f;   // when the CPU does not report one
     
 public:
@@ -35,15 +36,16 @@ public:
     void render(Framebuffer& fb, const Rect& area) override {
         const auto data = provider_->data();
         
-        Rect row1(area.x, area.y, area.w, ROW1_H);
-        Rect row2(area.x, area.y + ROW1_H + CARD_GAP, area.w, area.h - ROW1_H - CARD_GAP);
+        const int row1H = rowHeight(ROW1_H, area);
+        Rect row1(area.x, area.y, area.w, row1H);
+        Rect row2(area.x, area.y + row1H + cardGap(), area.w, area.h - row1H - cardGap());
         
-        renderCpuCard(fb, row1.column(0, 2, CARD_GAP), data);
-        renderMemoryCard(fb, row1.column(1, 2, CARD_GAP), data.memory);
+        renderCpuCard(fb, row1.column(0, 2, cardGap()), data);
+        renderMemoryCard(fb, row1.column(1, 2, cardGap()), data.memory);
         
-        renderDiskCard(fb, row2.column(0, 3, CARD_GAP), data);
-        renderPowerCard(fb, row2.column(1, 3, CARD_GAP));
-        renderUptimeCard(fb, row2.column(2, 3, CARD_GAP), data);
+        renderDiskCard(fb, row2.column(0, 3, cardGap()), data);
+        renderPowerCard(fb, row2.column(1, 3, cardGap()));
+        renderUptimeCard(fb, row2.column(2, 3, cardGap()), data);
     }
     
 private:
@@ -70,18 +72,19 @@ private:
     
     void renderCpuCard(Framebuffer& fb, const Rect& r, const SystemData& data) {
         drawCard(fb, r);
+        const int top = contentTop(r, ROW1_H);
         int x = r.x + CARD_PAD;
         int innerW = r.w - 2 * CARD_PAD;
-        drawSectionTitle(fb, x, r.y + R1_TITLE_Y, "CPU", Theme::SEC_CPU);
+        drawSectionTitle(fb, x, top + R1_TITLE_Y, "CPU", Theme::SEC_CPU);
         
         char buf[32];
         uint16_t cpuColor = percentToColor(data.cpu.usagePercent);
         snprintf(buf, sizeof(buf), "%d", static_cast<int>(data.cpu.usagePercent));
-        drawGaugeRing(fb, x + GAUGE_R, r.y + R1_GAUGE_CY, data.cpu.usagePercent, buf, "%", cpuColor);
+        drawGaugeRing(fb, x + GAUGE_R, top + R1_GAUGE_CY, data.cpu.usagePercent, buf, "%", cpuColor);
         
         int statsX = x + GAUGE_R * 2 + 8;
         int statsW = r.right() - CARD_PAD - statsX;
-        int statsY = r.y + R1_STAT_Y;
+        int statsY = top + R1_STAT_Y;
         
         snprintf(buf, sizeof(buf), "%.1fGHz", data.cpu.freqMHz / 1000.0f);
         fb.drawText(statsX, statsY, fb.fitText(buf, statsW), Theme::VALUE);
@@ -96,7 +99,7 @@ private:
         }
         
         if (!cpuHistory_.empty()) {
-            fb.drawSparkline(x, r.y + R1_STRIP_Y, innerW - 1, R1_STRIP_H,
+            fb.drawSparkline(x, top + R1_STRIP_Y, innerW - 1, R1_STRIP_H,
                              cpuHistory_.data(), HISTORY_SIZE,
                              Theme::GRAPH_LINE, true, Theme::GRAPH_FILL);
         }
@@ -104,18 +107,19 @@ private:
     
     void renderMemoryCard(Framebuffer& fb, const Rect& r, const MemoryData& mem) {
         drawCard(fb, r);
+        const int top = contentTop(r, ROW1_H);
         int x = r.x + CARD_PAD;
         int innerW = r.w - 2 * CARD_PAD;
-        drawSectionTitle(fb, x, r.y + R1_TITLE_Y, "MEM", Theme::SEC_MEM);
+        drawSectionTitle(fb, x, top + R1_TITLE_Y, "MEM", Theme::SEC_MEM);
         
         char buf[32];
         uint16_t memColor = percentToColor(mem.usagePercent);
         snprintf(buf, sizeof(buf), "%d", static_cast<int>(mem.usagePercent));
-        drawGaugeRing(fb, x + GAUGE_R, r.y + R1_GAUGE_CY, mem.usagePercent, buf, "%", memColor);
+        drawGaugeRing(fb, x + GAUGE_R, top + R1_GAUGE_CY, mem.usagePercent, buf, "%", memColor);
         
         int statsX = x + GAUGE_R * 2 + 8;
         int statsW = r.right() - CARD_PAD - statsX;
-        int statsY = r.y + R1_STAT_Y;
+        int statsY = top + R1_STAT_Y;
         
         // Megabytes on small machines, where gigabytes would read "0.1/0.4G"
         if (mem.totalMB < 2048) {
@@ -141,15 +145,16 @@ private:
         float free = 100.0f - used - cached - buffers;
         float percents[] = {used, cached, buffers, free};
         uint16_t colors[] = {Theme::MEM_USED, Theme::MEM_CACHED, Theme::MEM_BUFFERS, Theme::TRACK};
-        fb.drawStackedBar(x, r.y + R1_STRIP_Y - 1, innerW, R1_STRIP_H + 2,
+        fb.drawStackedBar(x, top + R1_STRIP_Y - 1, innerW, R1_STRIP_H + 2,
                           percents, colors, 4, Theme::BAR_BORDER);
     }
     
     void renderDiskCard(Framebuffer& fb, const Rect& r, const SystemData& data) {
         drawCard(fb, r);
+        const int top = contentTop(r, ROW2_H);
         int x = r.x + CARD_PAD;
         int innerW = r.w - 2 * CARD_PAD;
-        drawSectionTitle(fb, x, r.y + R2_TITLE_Y, "DISK", Theme::SEC_DISK);
+        drawSectionTitle(fb, x, top + R2_TITLE_Y, "DISK", Theme::SEC_DISK);
         
         const DiskData& disk = data.disk;
         float diskPercent = disk.usagePercent;
@@ -157,26 +162,27 @@ private:
         
         char buf[32];
         snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(diskPercent));
-        fb.drawText(x, r.y + R2_VALUE_Y, buf, diskColor, Font::Large);
+        fb.drawText(x, top + R2_VALUE_Y, buf, diskColor, Font::Large);
         
         snprintf(buf, sizeof(buf), "%d/%dG", disk.usedGB, disk.totalGB);
-        fb.drawText(x, r.y + R2_DETAIL_Y, fb.fitText(buf, innerW), Theme::TEXT_LABEL);
+        fb.drawText(x, top + R2_DETAIL_Y, fb.fitText(buf, innerW), Theme::TEXT_LABEL);
         
-        drawLevelBar(fb, x, r.y + R2_BAR_Y, innerW, diskPercent, diskColor);
+        drawLevelBar(fb, x, top + R2_BAR_Y, innerW, diskPercent, diskColor);
     }
     
     void renderPowerCard(Framebuffer& fb, const Rect& r) {
         drawCard(fb, r);
+        const int top = contentTop(r, ROW2_H);
         int x = r.x + CARD_PAD;
         int innerW = r.w - 2 * CARD_PAD;
-        drawSectionTitle(fb, x, r.y + R2_TITLE_Y, "POWER", Theme::SEC_POWER);
+        drawSectionTitle(fb, x, top + R2_TITLE_Y, "POWER", Theme::SEC_POWER);
         
         const auto sensors = sensorsProvider_->data();
         float power = sensors.totalPowerW;
         if (power <= 0) {
             // RAPL is missing, or not readable because the program is not root
-            fb.drawText(x, r.y + R2_VALUE_Y + 2, "N/A", Theme::TEXT_LABEL);
-            fb.drawText(x, r.y + R2_DETAIL_Y, "No sensor", Theme::TEXT_FAINT);
+            fb.drawText(x, top + R2_VALUE_Y + 2, "N/A", Theme::TEXT_LABEL);
+            fb.drawText(x, top + R2_DETAIL_Y, "No sensor", Theme::TEXT_FAINT);
             return;
         }
         
@@ -185,15 +191,16 @@ private:
         
         char buf[32];
         snprintf(buf, sizeof(buf), "%.1fW", power);
-        fb.drawText(x, r.y + R2_VALUE_Y, fb.fitText(buf, innerW, Font::Large), powerColor, Font::Large);
-        drawLevelBar(fb, x, r.y + R2_BAR_Y, innerW, std::min(100.0f, power / rated * 100.0f), powerColor);
+        fb.drawText(x, top + R2_VALUE_Y, fb.fitText(buf, innerW, Font::Large), powerColor, Font::Large);
+        drawLevelBar(fb, x, top + R2_BAR_Y, innerW, std::min(100.0f, power / rated * 100.0f), powerColor);
     }
     
     void renderUptimeCard(Framebuffer& fb, const Rect& r, const SystemData& data) {
         drawCard(fb, r);
+        const int top = contentTop(r, ROW2_H);
         int x = r.x + CARD_PAD;
         int innerW = r.w - 2 * CARD_PAD;
-        drawSectionTitle(fb, x, r.y + R2_TITLE_Y, "UPTIME", Theme::SEC_UPTIME);
+        drawSectionTitle(fb, x, top + R2_TITLE_Y, "UPTIME", Theme::SEC_UPTIME);
         
         char big[32], detail[32] = "";
         int secs = data.uptimeSeconds;
@@ -210,10 +217,10 @@ private:
         } else {
             snprintf(big, sizeof(big), "%dm", mins);
         }
-        fb.drawText(x, r.y + R2_VALUE_Y, fb.fitText(big, innerW, Font::Large),
+        fb.drawText(x, top + R2_VALUE_Y, fb.fitText(big, innerW, Font::Large),
                     Theme::VALUE, Font::Large);
         
-        fb.drawText(x, r.y + R2_DETAIL_Y, detail, Theme::TEXT_LABEL);
-        fb.drawText(x, r.y + R2_BAR_Y - 3, fb.fitText(data.hostname, innerW), Theme::VALUE_ALT);
+        fb.drawText(x, top + R2_DETAIL_Y, detail, Theme::TEXT_LABEL);
+        fb.drawText(x, top + R2_BAR_Y - 3, fb.fitText(data.hostname, innerW), Theme::VALUE_ALT);
     }
 };

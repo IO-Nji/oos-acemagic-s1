@@ -19,8 +19,9 @@ public:
     void render(Framebuffer& fb, const Rect& area) override {
         const auto data = provider_->data();
         
-        Rect summary(area.x, area.y, area.w, SUMMARY_H);
-        Rect list(area.x, area.y + SUMMARY_H + CARD_GAP, area.w, area.h - SUMMARY_H - CARD_GAP);
+        const int summaryH = rowHeight(SUMMARY_H, area);
+        Rect summary(area.x, area.y, area.w, summaryH);
+        Rect list(area.x, area.y + summaryH + cardGap(), area.w, area.h - summaryH - cardGap());
         
         renderSummary(fb, summary, data);
         renderServices(fb, list, data);
@@ -60,8 +61,8 @@ private:
         if (inactiveCount > 0) inactive = "INACTIVE:" + std::to_string(inactiveCount);
         
         if (!failed.empty() && !inactive.empty()) {
-            fb.drawTextRight(right, r.y + 4, failed, Theme::CRIT);
-            fb.drawTextRight(right, r.y + 14, inactive, Theme::WARN);
+            fb.drawTextRight(right, smallY - 5, failed, Theme::CRIT);
+            fb.drawTextRight(right, smallY + 5, inactive, Theme::WARN);
         } else if (!failed.empty()) {
             fb.drawTextRight(right, smallY, failed, Theme::CRIT);
         } else if (!inactive.empty()) {

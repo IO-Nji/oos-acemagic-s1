@@ -26,8 +26,9 @@ public:
             return;
         }
         
-        Rect summary(area.x, area.y, area.w, SUMMARY_H);
-        Rect list(area.x, area.y + SUMMARY_H + CARD_GAP, area.w, area.h - SUMMARY_H - CARD_GAP);
+        const int summaryH = rowHeight(SUMMARY_H, area);
+        Rect summary(area.x, area.y, area.w, summaryH);
+        Rect list(area.x, area.y + summaryH + cardGap(), area.w, area.h - summaryH - cardGap());
         
         renderSummary(fb, summary, data);
         renderContainers(fb, list, data);
@@ -60,8 +61,8 @@ private:
         if (data.paused > 0) notes.push_back({"PAUSE:" + std::to_string(data.paused), Theme::WARN});
         
         if (notes.size() >= 2) {
-            fb.drawTextRight(right, r.y + 4, notes[0].first, notes[0].second);
-            fb.drawTextRight(right, r.y + 14, notes[1].first, notes[1].second);
+            fb.drawTextRight(right, smallY - 5, notes[0].first, notes[0].second);
+            fb.drawTextRight(right, smallY + 5, notes[1].first, notes[1].second);
         } else if (notes.size() == 1) {
             fb.drawTextRight(right, smallY, notes[0].first, notes[0].second);
         }

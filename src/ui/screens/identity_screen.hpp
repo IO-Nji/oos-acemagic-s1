@@ -35,15 +35,16 @@ public:
             data.currentDate = buf;
         }
         
-        Rect banner(area.x, area.y, area.w, BANNER_H);
-        int lowerY = area.y + BANNER_H + CARD_GAP;
-        int lowerH = area.h - BANNER_H - CARD_GAP;
-        int leftW = (area.w - CARD_GAP) * LEFT_PCT / 100;
+        const int bannerH = rowHeight(BANNER_H, area);
+        Rect banner(area.x, area.y, area.w, bannerH);
+        int lowerY = area.y + bannerH + cardGap();
+        int lowerH = area.h - bannerH - cardGap();
+        int leftW = (area.w - cardGap()) * LEFT_PCT / 100;
         
         renderBanner(fb, banner, data);
         renderSystemInfo(fb, Rect(area.x, lowerY, leftW, lowerH), data);
-        renderSessionInfo(fb, Rect(area.x + leftW + CARD_GAP, lowerY,
-                                   area.w - leftW - CARD_GAP, lowerH), data);
+        renderSessionInfo(fb, Rect(area.x + leftW + cardGap(), lowerY,
+                                   area.w - leftW - cardGap(), lowerH), data);
     }
     
 private:
@@ -52,13 +53,14 @@ private:
     
     void renderBanner(Framebuffer& fb, const Rect& r, const IdentityData& data) {
         drawCard(fb, r);
+        const int top = contentTop(r, BANNER_H);
         int x = r.x + CARD_PAD;
         int right = r.right() - CARD_PAD;
         
         // Time and date on the right
         int timeW = fb.maxNumericWidth(data.currentTime, Font::Large);
-        fb.drawTextSteady(right, r.y + 5, data.currentTime, Theme::VALUE, Font::Large);
-        fb.drawTextRight(right, r.y + 22, data.currentDate, Theme::TEXT_LABEL);
+        fb.drawTextSteady(right, top + 5, data.currentTime, Theme::VALUE, Font::Large);
+        fb.drawTextRight(right, top + 22, data.currentDate, Theme::TEXT_LABEL);
         
         // Hostname takes the remaining width, centred on the card height
         int hostW = right - timeW - 10 - x;
