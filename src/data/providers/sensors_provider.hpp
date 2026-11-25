@@ -30,6 +30,9 @@ protected:
         }
         
         readPower(d);
+        
+        long alarm = 0;
+        d.underVoltage = !underVoltagePath_.empty() && readNumber(underVoltagePath_, alarm) && alarm != 0;
         return d;
     }
     
@@ -50,6 +53,7 @@ private:
     
     std::vector<Sensor> temps_, fans_;
     std::vector<RaplDomain> rapl_;
+    std::string underVoltagePath_;     // Raspberry Pi supply alarm, if this is a Pi
     std::chrono::steady_clock::time_point lastRaplTime_;
     
     static std::string readLine(const std::string& path) {
@@ -81,6 +85,9 @@ private:
         
         for (const auto& dir : devices) {
             std::string device = readLine(dir + "/name");
+            if (device == "rpi_volt" && fs::exists(dir + "/in0_lcrit_alarm", ec)) {
+                underVoltagePath_ = dir + "/in0_lcrit_alarm";
+            }
             for (const char* kind : {"temp", "fan"}) {
                 for (int i = 1; i <= 32; i++) {
                     std::string base = dir + "/" + kind + std::to_string(i);

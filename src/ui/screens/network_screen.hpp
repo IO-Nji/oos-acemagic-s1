@@ -86,7 +86,16 @@ private:
             int itemY = listY + shown * ITEM_H;
             
             drawStatusDot(fb, x + DOT_RADIUS, itemY, iface.isUp ? Theme::OK : Theme::CRIT);
-            fb.drawText(x + 11, itemY, fb.fitText(iface.name, innerW - 11), Theme::TEXT);
+            // Wi-Fi interfaces show their signal level beside the name
+            int nameW = innerW - 11;
+            if (iface.signalDbm < 0) {
+                std::string signal = std::to_string(iface.signalDbm) + "dBm";
+                uint16_t color = iface.signalDbm >= -67 ? Theme::OK
+                               : iface.signalDbm >= -80 ? Theme::WARN : Theme::CRIT;
+                fb.drawTextRight(x + innerW, itemY, signal, color);
+                nameW -= fb.textWidth(signal) + 4;
+            }
+            fb.drawText(x + 11, itemY, fb.fitText(iface.name, nameW), Theme::TEXT);
             
             snprintf(buf, sizeof(buf), "D:%s", formatSpeed(iface.rxBps).c_str());
             fb.drawText(x, itemY + 10, buf, Theme::DOWN);

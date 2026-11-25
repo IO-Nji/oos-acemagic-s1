@@ -160,6 +160,10 @@ static void testHealth() {
     h = health::evaluate(sys, sensors, docker, services);
     CHECK(h.level == Health::Level::Critical);
     CHECK(h.alerts.size() == 4 && h.alerts[0] == "1 SVC FAILED" && h.alerts[1] == "CPU 96C");
+    
+    sensors.underVoltage = true;
+    h = health::evaluate(sys, sensors, docker, services);
+    CHECK(h.alerts.size() == 5);
 }
 
 static void testMisc() {

@@ -2,6 +2,7 @@
 #include "data/provider_base.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <fstream>
 #include <map>
 #include <string>
@@ -36,6 +37,8 @@ protected:
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - prevTime_).count();
         prevTime_ = now;
         
+        const std::map<std::string, int> wifiSignal = readWifiSignal();
+        
         struct ifaddrs* ifaddr;
         if (getifaddrs(&ifaddr) != 0) return d;
         
@@ -52,6 +55,9 @@ protected:
             inet_ntop(AF_INET, &reinterpret_cast<struct sockaddr_in*>(ifa->ifa_addr)->sin_addr,
                       addr, sizeof(addr));
             iface.ipAddress = addr;
+            
+            auto signal = wifiSignal.find(iface.name);
+            if (signal != wifiSignal.end()) iface.signalDbm = signal->second;
             
             iface.rxBytes = readCounter(iface.name, "rx_bytes");
             iface.txBytes = readCounter(iface.name, "tx_bytes");
@@ -87,6 +93,22 @@ protected:
 private:
     std::chrono::steady_clock::time_point prevTime_ = std::chrono::steady_clock::now();
     std::map<std::string, std::pair<uint64_t, uint64_t>> prevBytes_;
+    
+    // Signal level in dBm of each wireless interface, from /proc/net/wireless:
+    //   wlan0: 0000   43.  -67.  -256 ...
+    static std::map<std::string, int> readWifiSignal() {
+        std::map<std::string, int> levels;
+        std::ifstream file("/proc/net/wireless");
+        std::string line;
+        while (std::getline(file, line)) {
+            char name[32];
+            float quality = 0, level = 0;
+            if (sscanf(line.c_str(), " %31[^:]: %*x %f %f", name, &quality, &level) == 3 && level < 0) {
+                levels[name] = static_cast<int>(level);
+            }
+        }
+        return levels;
+    }
     
     static uint64_t readCounter(const std::string& iface, const char* counter) {
         uint64_t value = 0;

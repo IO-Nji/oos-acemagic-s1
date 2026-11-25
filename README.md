@@ -98,6 +98,7 @@ affected setting keeps its default; the service still starts.
 | `n SVC FAILED` | a watched systemd unit is in the failed state | critical |
 | `DISK nn%` | the watched filesystem is 90 % full (97 %: critical) | warning |
 | `CPU nnC` | the CPU package reaches 85 C (95 C: critical) | warning |
+| `LOW VOLTAGE` | a Raspberry Pi reports that its supply voltage is too low | warning |
 | `n CTR UNHEALTHY` | a container is unhealthy, restarting or dead | warning |
 | `MEM nn%` | memory in use reaches 92 % | warning |
 

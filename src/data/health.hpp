@@ -47,6 +47,9 @@ namespace health {
             snprintf(buf, sizeof(buf), "CPU %dC", static_cast<int>(sensors.cpuTempC));
             (sensors.cpuTempC >= TEMP_CRIT ? critical : warning).push_back(buf);
         }
+        if (sensors.underVoltage) {
+            warning.push_back("LOW VOLTAGE");
+        }
         if (docker.unhealthy > 0) {
             warning.push_back(std::to_string(docker.unhealthy) + " CTR UNHEALTHY");
         }

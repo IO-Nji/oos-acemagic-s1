@@ -51,6 +51,7 @@ struct NetworkInterfaceData {
     uint64_t txBytes = 0;
     bool isUp = false;
     bool isVirtual = false;    // container bridge or similar; not counted in totals
+    int signalDbm = 0;         // Wi-Fi signal level; 0 for wired interfaces
 };
 
 struct NetworkData {
@@ -108,6 +109,7 @@ struct SensorsData {
     float ssdTempC = 0.0f;
     float totalPowerW = 0.0f;  // CPU package power
     float tdpW = 0.0f;         // CPU rated power
+    bool underVoltage = false; // supply voltage too low right now (Raspberry Pi)
 };
 
 struct IdentityData {

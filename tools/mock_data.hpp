@@ -169,6 +169,8 @@ inline Set stress() {
     s.sensors.ssdTempC = 100.0f;
     s.sensors.totalPowerW = 188.8f;
     s.sensors.tdpW = 12.0f;
+    s.sensors.underVoltage = true;
+    s.network.interfaces[1].signalDbm = -100;
 
     finish(s);
     return s;
