@@ -11,12 +11,15 @@ import sys
 from pathlib import Path
 from PIL import ImageFont
 
-# role, weight, pixel size
+# role, weight, pixel size at scale 1. Order matches the Font enum.
 FONTS = [
     ("Small", "SemiBold", 10),
     ("Title", "Bold", 10),
     ("Large", "Bold", 18),
 ]
+# Display scales to bake, in percent. 100 is the 320x170 S1 panel; 150 fits the same
+# layout on a 480-pixel-wide display.
+SCALES = [100, 150]
 FIRST, LAST = 0x20, 0x7E
 
 
@@ -34,6 +37,7 @@ def bake(ttf: Path, size: int):
         w, h = mask.size
         xoff, yoff = bbox[0], bbox[1] - cap_top
         offset = len(data)
+        assert offset < 65536, "glyph table too large for 16-bit offsets"
         nibbles = [mask.getpixel((x, y)) >> 4 for y in range(h) for x in range(w)]
         if len(nibbles) % 2:
             nibbles.append(0)
@@ -52,24 +56,45 @@ def main():
         '#include "core/font_data.hpp"',
         "",
     ]
-    for role, weight, size in FONTS:
-        cap, digit, glyphs, data = bake(src / f"Orbitron-{weight}.ttf", size)
-        name = f"orbitron{role}"
-        lines.append(f"// Orbitron {weight} {size}px, cap height {cap}px")
-        lines.append(f"static const uint8_t {name}Alpha[] = {{")
-        for i in range(0, len(data), 24):
-            lines.append("    " + ",".join(f"0x{b:02X}" for b in data[i:i + 24]) + ",")
-        lines.append("};")
-        lines.append(f"static const Glyph {name}Glyphs[] = {{")
-        for offset, w, h, xoff, yoff, advance, ch in glyphs:
-            label = ch if ch not in "\\/*" else f"0x{ord(ch):02X}"
-            lines.append(f"    {{{offset}, {w}, {h}, {xoff}, {yoff}, {advance}}},  // {label}")
-        lines.append("};")
-        lines.append(
-            f"const FontData FONT_{role.upper()} = {{{name}Glyphs, {name}Alpha, "
-            f"{FIRST}, {LAST - FIRST + 1}, {cap}, {digit}}};"
-        )
-        lines.append("")
+    sets = []
+    for scale in SCALES:
+        names = []
+        for role, weight, base in FONTS:
+            size = round(base * scale / 100)
+            cap, digit, glyphs, data = bake(src / f"Orbitron-{weight}.ttf", size)
+            name = f"orbitron{role}{scale}"
+            names.append(name)
+            lines.append(f"// Orbitron {weight} {size}px, cap height {cap}px")
+            lines.append(f"static const uint8_t {name}Alpha[] = {{")
+            for i in range(0, len(data), 24):
+                lines.append("    " + ",".join(f"0x{b:02X}" for b in data[i:i + 24]) + ",")
+            lines.append("};")
+            lines.append(f"static const Glyph {name}Glyphs[] = {{")
+            for offset, w, h, xoff, yoff, advance, ch in glyphs:
+                label = ch if ch not in "\\/*" else f"0x{ord(ch):02X}"
+                lines.append(f"    {{{offset}, {w}, {h}, {xoff}, {yoff}, {advance}}},  // {label}")
+            lines.append("};")
+            lines.append(
+                f"static const FontData {name} = {{{name}Glyphs, {name}Alpha, "
+                f"{FIRST}, {LAST - FIRST + 1}, {cap}, {digit}}};"
+            )
+            lines.append("")
+        sets.append((scale, names))
+
+    lines.append("static const FontSet fontSets[] = {")
+    for scale, names in sets:
+        lines.append(f"    {{{scale}, {{{', '.join('&' + n for n in names)}}}}},")
+    lines.append("};")
+    lines.append("")
+    lines.append("const FontSet& fontSetFor(int scalePercent) {")
+    lines.append("    const FontSet* best = &fontSets[0];")
+    lines.append("    for (const FontSet& set : fontSets) {")
+    lines.append("        int d = set.scalePercent - scalePercent, bd = best->scalePercent - scalePercent;")
+    lines.append("        if (d * d < bd * bd) best = &set;")
+    lines.append("    }")
+    lines.append("    return *best;")
+    lines.append("}")
+    lines.append("")
     out.write_text("\n".join(lines))
     print(f"wrote {out} ({out.stat().st_size} bytes)")
 

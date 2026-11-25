@@ -127,8 +127,17 @@ static void testConfig() {
     CHECK(c.pages.size() == 2);
     CHECK(c.diskPath == "/srv");
     
-    Config defaults;
+    Config defaults = Config::defaultsFor("my-unit");
     CHECK(defaults.pages.size() == 6 && defaults.pageIntervalSec == 5);
+    CHECK(defaults.services.back() == "my-unit");
+    
+    // Device settings are collected only when the device names them
+    Config device;
+    device.deviceKeys = {"panel"};
+    w.clear();
+    device.apply("panel = /dev/fb1\nother = 1\n", w);
+    CHECK(device.deviceSettings["panel"] == "/dev/fb1");
+    CHECK(w.size() == 1);
 }
 
 static void testHealth() {

@@ -78,7 +78,7 @@ bool Panel::sendTile(const Framebuffer& fb, int x, int y, int w, int h) {
     
     uint8_t* dst = command_.data() + protocol::HEADER_SIZE;
     for (int row = 0; row < h; row++) {
-        std::memcpy(dst, fb.pixels() + (y + row) * fb.width() + x, w * sizeof(uint16_t));
+        std::memcpy(dst, fb.pixels() + (y + row) * fb.deviceWidth() + x, w * sizeof(uint16_t));
         dst += w * sizeof(uint16_t);
     }
     return sendCommand();
@@ -86,7 +86,7 @@ bool Panel::sendTile(const Framebuffer& fb, int x, int y, int w, int h) {
 
 Panel::PresentResult Panel::present(const Framebuffer& fb) {
     PresentResult result;
-    const size_t pixelCount = static_cast<size_t>(fb.width()) * fb.height();
+    const size_t pixelCount = static_cast<size_t>(fb.deviceWidth()) * fb.deviceHeight();
     
     if (repaintAll_.exchange(false)) shownValid_ = false;
     if (shown_.size() != pixelCount) {
@@ -94,7 +94,7 @@ Panel::PresentResult Panel::present(const Framebuffer& fb) {
         shownValid_ = false;
     }
     
-    auto tiles = dirtyTiles(shownValid_ ? shown_.data() : nullptr, fb.pixels(), fb.width(), fb.height());
+    auto tiles = dirtyTiles(shownValid_ ? shown_.data() : nullptr, fb.pixels(), fb.deviceWidth(), fb.deviceHeight());
     
     bool allDelivered = true;
     for (const Tile& t : tiles) {
@@ -102,7 +102,7 @@ Panel::PresentResult Panel::present(const Framebuffer& fb) {
         if (sendTile(fb, t.x, t.y, t.w, t.h)) {
             result.sent++;
             for (int row = 0; row < t.h; row++) {
-                size_t offset = static_cast<size_t>(t.y + row) * fb.width() + t.x;
+                size_t offset = static_cast<size_t>(t.y + row) * fb.deviceWidth() + t.x;
                 std::copy_n(fb.pixels() + offset, t.w, shown_.begin() + offset);
             }
         } else {

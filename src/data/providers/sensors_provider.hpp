@@ -127,7 +127,7 @@ private:
             d.temperatures.push_back({sensor.name, temp});
             
             bool cpuDevice = sensor.device == "coretemp" || sensor.device == "k10temp" ||
-                             sensor.device == "zenpower";
+                             sensor.device == "zenpower" || sensor.device == "cpu_thermal";
             if (cpuDevice && (contains(sensor.name, "Package") || contains(sensor.name, "Tctl"))) {
                 d.cpuTempC = std::max(d.cpuTempC, temp);
             } else if (cpuDevice) {

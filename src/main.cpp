@@ -1,9 +1,5 @@
-#include "core/config.hpp"
-#include "core/framebuffer.hpp"
-#include "data/collector.hpp"
-#include "data/health.hpp"
+#include "app/dashboard.hpp"
 #include "hw/panel.hpp"
-#include "ui/pages.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -18,6 +14,9 @@ using namespace std::chrono_literals;
 #ifndef OOS_VERSION
 #define OOS_VERSION "dev"
 #endif
+
+static const char* const SERVICE_NAME = "oos-acemagic-s1";
+static const char* const DEFAULT_CONFIG = "/etc/oos-acemagic-s1/config.conf";
 
 static std::atomic<bool> running{true};
 
@@ -38,7 +37,7 @@ static void reportTransfers(long sent, long failed) {
 
 static void printUsage(const char* program) {
     std::cout << "Usage: " << program << " [options]\n"
-              << "  --config <file>   Settings file (default: " << Config::DEFAULT_PATH << ")\n"
+              << "  --config <file>   Settings file (default: " << DEFAULT_CONFIG << ")\n"
               << "  --interval <sec>  Seconds per page, overriding the settings file\n"
               << "  --dry-run         Collect and render without opening the panel\n"
               << "  --version         Print the version\n"
@@ -46,7 +45,7 @@ static void printUsage(const char* program) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string configPath = Config::DEFAULT_PATH;
+    std::string configPath = DEFAULT_CONFIG;
     bool configGiven = false, dryRun = false;
     int intervalOverride = 0;
     
@@ -60,7 +59,7 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--dry-run") {
             dryRun = true;
         } else if (arg == "--version") {
-            std::cout << "oos-acemagic-s1 " << OOS_VERSION << std::endl;
+            std::cout << SERVICE_NAME << " " << OOS_VERSION << std::endl;
             return 0;
         } else if (arg == "--help") {
             printUsage(argv[0]);
@@ -72,7 +71,7 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    Config config;
+    Config config = Config::defaultsFor(SERVICE_NAME);
     std::vector<std::string> warnings;
     if (!config.load(configPath, warnings) && configGiven) {
         std::cerr << "Cannot read " << configPath << std::endl;
@@ -92,28 +91,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    Providers providers(config);
+    Dashboard dashboard(config, DisplayProfile());
+    dashboard.startCollectors();
     
-    // Data is collected off the render thread. Cheap /proc and /sys readers share one
-    // thread; sources that start subprocesses get their own so they cannot delay it.
-    Collector fastCollector, slowCollector;
-    fastCollector.add(providers.system, 1s);
-    fastCollector.add(providers.network, 1s);
-    fastCollector.add(providers.sensors, 2s);
-    fastCollector.add(providers.identity, 5s);
-    slowCollector.add(providers.docker, 10s);
-    slowCollector.add(providers.services, 10s);
-    fastCollector.start();
-    slowCollector.start();
-    
-    Framebuffer fb(protocol::DISPLAY_WIDTH, protocol::DISPLAY_HEIGHT);
-    auto health = std::make_shared<Health>();
-    ScreenManager screens(fb, health);
-    addPages(screens, config, providers, health);
-    screens.setPageInterval(std::chrono::seconds(config.pageIntervalSec));
-    
-    std::cout << "oos-acemagic-s1 " << OOS_VERSION << ": " << screens.pageCount() << " pages, "
-              << config.pageIntervalSec << "s each" << (dryRun ? " (dry run)" : "") << std::endl;
+    std::cout << SERVICE_NAME << " " << OOS_VERSION << ": " << dashboard.screens().pageCount()
+              << " pages, " << config.pageIntervalSec << "s each" << (dryRun ? " (dry run)" : "")
+              << std::endl;
     
     // Keepalive on its own thread so a long repaint never delays it
     std::thread heartbeatThread([&panel, dryRun]() {
@@ -143,13 +126,10 @@ int main(int argc, char* argv[]) {
     while (running) {
         auto frameStart = std::chrono::steady_clock::now();
         
-        *health = health::evaluate(providers.system->data(), providers.sensors->data(),
-                                   providers.docker->data(), providers.services->data());
-        screens.update();
-        screens.render();
+        dashboard.renderFrame();
         
         if (!dryRun) {
-            Panel::PresentResult result = panel.present(fb);
+            Panel::PresentResult result = panel.present(dashboard.framebuffer());
             tilesSent += result.sent;
             tilesFailed += result.failed;
             
@@ -173,8 +153,7 @@ int main(int argc, char* argv[]) {
     if (!dryRun) reportTransfers(tilesSent, tilesFailed);
     running = false;
     heartbeatThread.join();
-    fastCollector.stop();
-    slowCollector.stop();
+    dashboard.stopCollectors();
     if (!dryRun) panel.close();
     
     return exitCode;

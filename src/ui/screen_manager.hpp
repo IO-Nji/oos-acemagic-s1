@@ -157,6 +157,18 @@ public:
             lastSwitch_ = std::chrono::steady_clock::now();
         }
     }
+    size_t currentPage() const { return current_; }
+    
+    // Manual navigation; the page that is chosen gets a full interval before rotating on
+    void nextPage() { if (!pages_.empty()) setPage((current_ + 1) % pages_.size()); }
+    void prevPage() { if (!pages_.empty()) setPage((current_ + pages_.size() - 1) % pages_.size()); }
+    
+    // While held, pages do not rotate on their own
+    void setHold(bool hold) {
+        hold_ = hold;
+        lastSwitch_ = std::chrono::steady_clock::now();
+    }
+    bool hold() const { return hold_; }
     
     // Preview/test hook: fixed clock text and a steady activity dot
     void setTimeOverride(const std::string& t) { timeOverride_ = t; }
@@ -172,7 +184,7 @@ public:
         if (pages_.empty()) return;
         
         auto now = std::chrono::steady_clock::now();
-        if (interval_.count() > 0 && now - lastSwitch_ >= interval_) {
+        if (!hold_ && interval_.count() > 0 && now - lastSwitch_ >= interval_) {
             current_ = (current_ + 1) % pages_.size();
             lastSwitch_ = now;
         }
@@ -188,6 +200,7 @@ private:
     std::vector<std::shared_ptr<ScreenBase>> pages_;
     size_t current_ = 0;
     std::chrono::milliseconds interval_{5000};
+    bool hold_ = false;
     std::chrono::steady_clock::time_point lastSwitch_ = std::chrono::steady_clock::now();
     std::string timeOverride_;
     

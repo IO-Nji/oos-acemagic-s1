@@ -82,7 +82,7 @@ page_interval = 5
 pages = system, network, sensors, docker, services, identity
 
 # systemd units listed on the Services page. Units that do not exist are skipped.
-services = ssh, docker, oos-acemagic-s1, nginx, apache2, mysql, mariadb, postgresql, redis
+services = ssh, docker, nginx, apache2, mysql, mariadb, postgresql, redis, mosquitto, oos-acemagic-s1
 
 # Filesystem shown in the DISK card and watched for the disk alert
 disk = /
@@ -140,6 +140,7 @@ seconds. Small changes (the clock, a value) take a fraction of that. See
 
 ```
 src/core   drawing, Orbitron glyphs, theme, settings, changed-region tracking
+src/app    the dashboard assembled from the parts below, without any hardware
 src/hw     USB device and the panel transport
 src/data   providers (system, network, sensors, docker, services, identity),
            background collection, health evaluation
@@ -156,6 +157,9 @@ tests      unit tests
   several seconds after each one; the details are in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 - The service uses about 1.5 % of one core and under 15 MB of memory, including the
   `docker` and `systemctl` commands it runs.
+- Pages are laid out once, in units of the S1's 320x170 panel. Everything except
+  `src/hw` and `src/main.cpp` is device-independent, so another display can reuse it
+  at a different scale by adding this repository as a subdirectory and linking `oos_core`.
 - It runs as root (needed for the power counters and the Docker socket) with
   `NoNewPrivileges`, a read-only system and home, and a private `/tmp`.
 

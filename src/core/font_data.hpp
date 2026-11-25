@@ -19,6 +19,11 @@ struct FontData {
     uint8_t digitAdvance;   // widest digit, used for fixed-width numbers
 };
 
-extern const FontData FONT_SMALL;
-extern const FontData FONT_TITLE;
-extern const FontData FONT_LARGE;
+// The fonts for one display scale, indexed by the Font enum
+struct FontSet {
+    int scalePercent;
+    const FontData* fonts[3];
+};
+
+// The baked set closest to the requested scale (100 = one device pixel per layout unit)
+const FontSet& fontSetFor(int scalePercent);

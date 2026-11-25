@@ -72,6 +72,8 @@ void Config::apply(const std::string& text, std::vector<std::string>& warnings) 
             } else {
                 diskPath = value;
             }
+        } else if (deviceKeys.count(key)) {
+            deviceSettings[key] = value;
         } else {
             warnings.push_back(where + "unknown setting \"" + key + "\"");
         }

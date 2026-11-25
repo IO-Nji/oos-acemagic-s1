@@ -26,6 +26,12 @@ add_library(oos_core STATIC
 target_include_directories(oos_core PUBLIC src)
 target_link_libraries(oos_core PUBLIC Threads::Threads)
 
+# Another device's project can add this directory and link oos_core; everything
+# below is only for building the S1 program itself.
+if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    return()
+endif()
+
 if(OOS_BUILD_SERVICE)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)

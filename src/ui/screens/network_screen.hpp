@@ -156,7 +156,7 @@ private:
             for (int px = x1; px <= x2; px++) {
                 float t = (x2 == x1) ? 0 : static_cast<float>(px - x1) / (x2 - x1);
                 int py = y1 + static_cast<int>(t * (y2 - y1));
-                fb.drawVLine(px, py, bottom - py + 1, fillColor);
+                fb.fillRect(px, py, 1, bottom - py + 1, fillColor);
             }
             
             fb.drawLine(x1, y1, x2, y2, lineColor);

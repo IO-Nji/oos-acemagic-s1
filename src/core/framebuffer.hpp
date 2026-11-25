@@ -11,33 +11,41 @@ enum class Font {
     Large,   // headline values
 };
 
+// Ratio of device pixels to layout units. Pages are laid out once, in units of the
+// 320x170 S1 panel; a larger display uses the same layout at a larger scale.
+struct UiScale {
+    int num = 1;
+    int den = 1;
+};
+
+// A drawing surface. All coordinates passed in are layout units; the pixel buffer
+// is in device pixels. At scale 1 the two are the same.
 class Framebuffer {
 public:
-    Framebuffer(int width, int height);
+    // width and height in layout units
+    Framebuffer(int width, int height, UiScale scale = UiScale());
     
-    // Accessors
     int width() const { return width_; }
     int height() const { return height_; }
-    // Pixels in panel byte order, row by row
+    
+    // The pixel buffer: panel byte order, row by row
+    int deviceWidth() const { return devWidth_; }
+    int deviceHeight() const { return devHeight_; }
     const uint16_t* pixels() const { return pixels_.data(); }
     
-    // Basic drawing
     void clear(uint16_t color = Theme::BLACK);
-    void setPixel(int x, int y, uint16_t color);
-    // Mix color into the pixel; alpha 0..15
-    void blendPixel(int x, int y, uint16_t color, uint8_t alpha);
     
-    // Primitives
-    void drawLine(int x0, int y0, int x1, int y1, uint16_t color);
-    void drawRect(int x, int y, int w, int h, uint16_t color);
+    // Filled shapes. Neighbouring rectangles meet without gaps at any scale.
     void fillRect(int x, int y, int w, int h, uint16_t color);
+    void fillRoundedRect(int x, int y, int w, int h, int radius, uint16_t color);
     void fillCircle(int cx, int cy, int r, uint16_t color);   // anti-aliased
+    
+    // Outlines and rules, one stroke wide
+    void drawLine(int x0, int y0, int x1, int y1, uint16_t color);
     void drawHLine(int x, int y, int w, uint16_t color);
     void drawVLine(int x, int y, int h, uint16_t color);
-    
-    // Rounded rectangles
+    void drawRect(int x, int y, int w, int h, uint16_t color);
     void drawRoundedRect(int x, int y, int w, int h, int radius, uint16_t color);
-    void fillRoundedRect(int x, int y, int w, int h, int radius, uint16_t color);
     
     // Segmented bar
     void drawSegmentedBar(int x, int y, int w, int h, float percent,
@@ -69,7 +77,7 @@ public:
     void drawTextSteady(int xRight, int y, const std::string& str, uint16_t color,
                         Font font = Font::Small);
     int textHeight(Font font = Font::Small) const;
-    // Shorten str with a trailing ".." until it fits maxWidth pixels
+    // Shorten str with a trailing ".." until it fits maxWidth
     std::string fitText(const std::string& str, int maxWidth, Font font = Font::Small) const;
     
     // Layout audit: records the box of every drawText call so tools can detect
@@ -79,8 +87,22 @@ public:
     const std::vector<TextBox>& textBoxes() const { return textBoxes_; }
 
 private:
-    int width_;
-    int height_;
+    // Layout units -> device pixels, and back (rounding up)
+    int dev(int v) const;
+    float devLength(int v) const { return static_cast<float>(v) * scale_.num / scale_.den; }
+    int unitsCeil(int devPixels) const { return (devPixels * scale_.den + scale_.num - 1) / scale_.num; }
+    
+    // Device-pixel primitives
+    void devPixel(int x, int y, uint16_t color);
+    void devBlend(int x, int y, uint16_t color, uint8_t alpha);   // alpha 0..15
+    void devFill(int x0, int y0, int x1, int y1, uint16_t color); // x1, y1 exclusive
+    int devTextWidth(const std::string& str, Font font, bool steadyDigits) const;
+    void devText(int x, int y, const std::string& str, uint16_t color, Font font);
+    
+    int width_, height_;
+    UiScale scale_;
+    int devWidth_, devHeight_;
+    int stroke_;                       // line thickness in device pixels
     std::vector<uint16_t> pixels_;
     bool audit_ = false;
     std::vector<TextBox> textBoxes_;
