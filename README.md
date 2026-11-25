@@ -154,7 +154,8 @@ tests      unit tests
 - The display is updated by sending only the rectangles that changed. The panel's
   full-screen redraw command is avoided because the firmware stops responding for
   several seconds after each one; the details are in [docs/PROTOCOL.md](docs/PROTOCOL.md).
-- The service uses about 1.5 % of one core and 5 MB of memory.
+- The service uses about 1.5 % of one core and under 15 MB of memory, including the
+  `docker` and `systemctl` commands it runs.
 - It runs as root (needed for the power counters and the Docker socket) with
   `NoNewPrivileges`, a read-only system and home, and a private `/tmp`.
 
