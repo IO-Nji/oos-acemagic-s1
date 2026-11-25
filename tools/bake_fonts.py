@@ -17,25 +17,26 @@ FONTS = [
     ("Title", 10),
     ("Large", 18),
 ]
-# Display scales to bake, in percent, with the weight of each role. 100 is the 320x170
-# S1 panel. 150 fits the same layout on a 480-pixel-wide display; those are small SPI
-# panels with soft pixels and little contrast, so its weights are a step heavier.
+# Display scales to bake, in percent, with the weight of each role and the extra
+# space after every character in device pixels. 100 is the 320x170 S1 panel. 150 fits
+# the same layout on a 480-pixel-wide display; those are small SPI panels with soft
+# pixels and little contrast, so its type is a step heavier and set wider apart.
 SCALES = {
-    100: ("SemiBold", "Bold", "Bold"),
-    150: ("Bold", "ExtraBold", "ExtraBold"),
+    100: (("SemiBold", "Bold", "Bold"), (0, 0, 0)),
+    150: (("Bold", "ExtraBold", "ExtraBold"), (1, 1, 2)),
 }
 FIRST, LAST = 0x20, 0x7E
 
 
-def bake(ttf: Path, size: int):
+def bake(ttf: Path, size: int, tracking: int):
     font = ImageFont.truetype(str(ttf), size)
     cap_top = font.getbbox("H")[1]
     cap_height = font.getbbox("H")[3] - cap_top
-    digit_advance = max(round(font.getlength(d)) for d in "0123456789")
+    digit_advance = max(round(font.getlength(d)) for d in "0123456789") + tracking
     glyphs, data = [], bytearray()
     for code in range(FIRST, LAST + 1):
         ch = chr(code)
-        advance = round(font.getlength(ch))
+        advance = round(font.getlength(ch)) + tracking
         bbox = font.getbbox(ch)
         mask = font.getmask(ch)
         w, h = mask.size
@@ -61,14 +62,14 @@ def main():
         "",
     ]
     sets = []
-    for scale, weights in SCALES.items():
+    for scale, (weights, trackings) in SCALES.items():
         names = []
-        for (role, base), weight in zip(FONTS, weights):
+        for (role, base), weight, tracking in zip(FONTS, weights, trackings):
             size = round(base * scale / 100)
-            cap, digit, glyphs, data = bake(src / f"Orbitron-{weight}.ttf", size)
+            cap, digit, glyphs, data = bake(src / f"Orbitron-{weight}.ttf", size, tracking)
             name = f"orbitron{role}{scale}"
             names.append(name)
-            lines.append(f"// Orbitron {weight} {size}px, cap height {cap}px")
+            lines.append(f"// Orbitron {weight} {size}px, cap height {cap}px, tracking {tracking}px")
             lines.append(f"static const uint8_t {name}Alpha[] = {{")
             for i in range(0, len(data), 24):
                 lines.append("    " + ",".join(f"0x{b:02X}" for b in data[i:i + 24]) + ",")

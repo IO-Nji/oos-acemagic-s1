@@ -2,6 +2,7 @@
 #include "ui/screen_manager.hpp"
 #include "data/providers/system_provider.hpp"
 #include "data/providers/sensors_provider.hpp"
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -70,6 +71,29 @@ private:
     static constexpr int R2_DETAIL_Y = 33;
     static constexpr int R2_BAR_Y = 46;
     
+    // A ring gauge with three lines of figures beside it; the pair is placed in the
+    // card according to the device's alignment
+    void drawGaugeWithStats(Framebuffer& fb, const Rect& r, int top, float percent,
+                            const std::string& reading, uint16_t color,
+                            const std::array<std::string, 3>& lines,
+                            const std::array<uint16_t, 3>& colors) {
+        const int ringW = GAUGE_R * 2 + 8;
+        const int room = r.w - 2 * CARD_PAD - ringW;
+        
+        std::array<std::string, 3> text;
+        int statsW = 0;
+        for (int i = 0; i < 3; i++) {
+            text[i] = fb.fitText(lines[i], room);
+            statsW = std::max(statsW, fb.textWidth(text[i]));
+        }
+        
+        int x = contentLeft(r, ringW + statsW);
+        drawGaugeRing(fb, x + GAUGE_R, top + R1_GAUGE_CY, percent, reading, "%", color);
+        for (int i = 0; i < 3; i++) {
+            fb.drawText(x + ringW, top + R1_STAT_Y + i * R1_STAT_PITCH, text[i], colors[i]);
+        }
+    }
+    
     void renderCpuCard(Framebuffer& fb, const Rect& r, const SystemData& data) {
         drawCard(fb, r);
         const int top = contentTop(r, ROW1_H);
@@ -77,26 +101,16 @@ private:
         int innerW = r.w - 2 * CARD_PAD;
         drawSectionTitle(fb, x, top + R1_TITLE_Y, "CPU", Theme::SEC_CPU);
         
-        char buf[32];
+        char reading[16], freq[32], load[32], tempText[16] = "";
         uint16_t cpuColor = percentToColor(data.cpu.usagePercent);
-        snprintf(buf, sizeof(buf), "%d", static_cast<int>(data.cpu.usagePercent));
-        drawGaugeRing(fb, x + GAUGE_R, top + R1_GAUGE_CY, data.cpu.usagePercent, buf, "%", cpuColor);
-        
-        int statsX = x + GAUGE_R * 2 + 8;
-        int statsW = r.right() - CARD_PAD - statsX;
-        int statsY = top + R1_STAT_Y;
-        
-        snprintf(buf, sizeof(buf), "%.1fGHz", data.cpu.freqMHz / 1000.0f);
-        fb.drawText(statsX, statsY, fb.fitText(buf, statsW), Theme::VALUE);
-        
-        snprintf(buf, sizeof(buf), "L:%.2f", data.cpu.loadAvg1);
-        fb.drawText(statsX, statsY + R1_STAT_PITCH, fb.fitText(buf, statsW), Theme::TEXT);
-        
+        snprintf(reading, sizeof(reading), "%d", static_cast<int>(data.cpu.usagePercent));
+        snprintf(freq, sizeof(freq), "%.1fGHz", data.cpu.freqMHz / 1000.0f);
+        snprintf(load, sizeof(load), "L:%.2f", data.cpu.loadAvg1);
         float temp = sensorsProvider_->data().cpuTempC;
-        if (temp > 0) {
-            snprintf(buf, sizeof(buf), "%.0fC", temp);
-            fb.drawText(statsX, statsY + 2 * R1_STAT_PITCH, buf, tempToColor(temp));
-        }
+        if (temp > 0) snprintf(tempText, sizeof(tempText), "%.0fC", temp);
+        
+        drawGaugeWithStats(fb, r, top, data.cpu.usagePercent, reading, cpuColor,
+                           {freq, load, tempText}, {Theme::VALUE, Theme::TEXT, tempToColor(temp)});
         
         if (!cpuHistory_.empty()) {
             fb.drawSparkline(x, top + R1_STRIP_Y, innerW - 1, R1_STRIP_H,
@@ -112,28 +126,21 @@ private:
         int innerW = r.w - 2 * CARD_PAD;
         drawSectionTitle(fb, x, top + R1_TITLE_Y, "MEM", Theme::SEC_MEM);
         
-        char buf[32];
+        char reading[16], usage[32], cache[32], swap[32];
         uint16_t memColor = percentToColor(mem.usagePercent);
-        snprintf(buf, sizeof(buf), "%d", static_cast<int>(mem.usagePercent));
-        drawGaugeRing(fb, x + GAUGE_R, top + R1_GAUGE_CY, mem.usagePercent, buf, "%", memColor);
-        
-        int statsX = x + GAUGE_R * 2 + 8;
-        int statsW = r.right() - CARD_PAD - statsX;
-        int statsY = top + R1_STAT_Y;
-        
+        snprintf(reading, sizeof(reading), "%d", static_cast<int>(mem.usagePercent));
         // Megabytes on small machines, where gigabytes would read "0.1/0.4G"
         if (mem.totalMB < 2048) {
-            snprintf(buf, sizeof(buf), "%d/%dM", mem.usedMB, mem.totalMB);
+            snprintf(usage, sizeof(usage), "%d/%dM", mem.usedMB, mem.totalMB);
         } else {
-            snprintf(buf, sizeof(buf), "%.1f/%.1fG", mem.usedMB / 1024.0f, mem.totalMB / 1024.0f);
+            snprintf(usage, sizeof(usage), "%.1f/%.1fG", mem.usedMB / 1024.0f, mem.totalMB / 1024.0f);
         }
-        fb.drawText(statsX, statsY, fb.fitText(buf, statsW), Theme::VALUE);
+        snprintf(cache, sizeof(cache), "C:%dM", mem.cachedMB);
+        snprintf(swap, sizeof(swap), "S:%d%%", static_cast<int>(mem.swapUsagePercent));
         
-        snprintf(buf, sizeof(buf), "C:%dM", mem.cachedMB);
-        fb.drawText(statsX, statsY + R1_STAT_PITCH, fb.fitText(buf, statsW), Theme::TEXT);
-        
-        snprintf(buf, sizeof(buf), "S:%d%%", static_cast<int>(mem.swapUsagePercent));
-        fb.drawText(statsX, statsY + 2 * R1_STAT_PITCH, buf, percentToColor(mem.swapUsagePercent));
+        drawGaugeWithStats(fb, r, top, mem.usagePercent, reading, memColor,
+                           {usage, cache, swap},
+                           {Theme::VALUE, Theme::TEXT, percentToColor(mem.swapUsagePercent)});
         
         // Breakdown bar: in use (same figure as the ring), page cache, buffers, free.
         // Cache and buffers are reclaimable, so they sit on top of "in use".
@@ -162,10 +169,10 @@ private:
         
         char buf[32];
         snprintf(buf, sizeof(buf), "%d%%", static_cast<int>(diskPercent));
-        fb.drawText(x, top + R2_VALUE_Y, buf, diskColor, Font::Large);
+        drawCardText(fb, r, top + R2_VALUE_Y, buf, diskColor, Font::Large);
         
         snprintf(buf, sizeof(buf), "%d/%dG", disk.usedGB, disk.totalGB);
-        fb.drawText(x, top + R2_DETAIL_Y, fb.fitText(buf, innerW), Theme::TEXT_LABEL);
+        drawCardText(fb, r, top + R2_DETAIL_Y, fb.fitText(buf, innerW), Theme::TEXT_LABEL);
         
         drawLevelBar(fb, x, top + R2_BAR_Y, innerW, diskPercent, diskColor);
     }
@@ -181,8 +188,7 @@ private:
         float power = sensors.totalPowerW;
         if (power <= 0) {
             // RAPL is missing, or not readable because the program is not root
-            fb.drawText(x, top + R2_VALUE_Y + 2, "N/A", Theme::TEXT_LABEL);
-            fb.drawText(x, top + R2_DETAIL_Y, "No sensor", Theme::TEXT_FAINT);
+            drawUnavailable(fb, r, top + R2_VALUE_Y + 2, top + R2_DETAIL_Y, "No sensor");
             return;
         }
         
@@ -191,7 +197,7 @@ private:
         
         char buf[32];
         snprintf(buf, sizeof(buf), "%.1fW", power);
-        fb.drawText(x, top + R2_VALUE_Y, fb.fitText(buf, innerW, Font::Large), powerColor, Font::Large);
+        drawCardText(fb, r, top + R2_VALUE_Y, fb.fitText(buf, innerW, Font::Large), powerColor, Font::Large);
         drawLevelBar(fb, x, top + R2_BAR_Y, innerW, std::min(100.0f, power / rated * 100.0f), powerColor);
     }
     
@@ -217,10 +223,10 @@ private:
         } else {
             snprintf(big, sizeof(big), "%dm", mins);
         }
-        fb.drawText(x, top + R2_VALUE_Y, fb.fitText(big, innerW, Font::Large),
-                    Theme::VALUE, Font::Large);
+        drawCardText(fb, r, top + R2_VALUE_Y, fb.fitText(big, innerW, Font::Large),
+                     Theme::VALUE, Font::Large);
         
-        fb.drawText(x, top + R2_DETAIL_Y, detail, Theme::TEXT_LABEL);
-        fb.drawText(x, top + R2_BAR_Y - 3, fb.fitText(data.hostname, innerW), Theme::VALUE_ALT);
+        drawCardText(fb, r, top + R2_DETAIL_Y, detail, Theme::TEXT_LABEL);
+        drawCardText(fb, r, top + R2_BAR_Y - 3, fb.fitText(data.hostname, innerW), Theme::VALUE_ALT);
     }
 };

@@ -36,12 +36,45 @@ public:
     
     const std::string& title() const { return title_; }
     
-    // Space between cards, set by the device's layout
-    void setCardGap(int gap) { cardGap_ = gap; }
+    // Spacing and alignment, set by the device's layout
+    void setChrome(const Chrome& chrome) {
+        cardGap_ = chrome.cardGap;
+        centered_ = chrome.centerCards;
+    }
     
 protected:
     std::string title_;
     int cardGap_ = Layout::CARD_GAP;
+    bool centered_ = false;
+    
+    // Where a block of content `width` wide starts in a card: at the left padding,
+    // or centred if the device centres card content
+    int contentLeft(const Rect& card, int width) const {
+        return centered_ ? card.x + (card.w - width) / 2 : card.x + CARD_PAD;
+    }
+    
+    // A line of text in a card, aligned the same way
+    void drawCardText(Framebuffer& fb, const Rect& card, int y, const std::string& text,
+                      uint16_t color, Font font = Font::Small) {
+        if (centered_) {
+            fb.drawTextCentered(card.x + card.w / 2, y, text, color, font);
+        } else {
+            fb.drawText(card.x + CARD_PAD, y, text, color, font);
+        }
+    }
+    
+    // "N/A" and the reason, for a reading this machine cannot provide. y1 and y2 are
+    // the two lines when left-aligned; centred, the pair sits in the middle of
+    // the space from y1 to the bottom of the card.
+    void drawUnavailable(Framebuffer& fb, const Rect& card, int y1, int y2, const std::string& reason) {
+        if (centered_) {
+            int pitch = y2 - y1;
+            y1 += (card.bottom() - CARD_PAD - y1 - pitch - fb.textHeight()) / 2;
+            y2 = y1 + pitch;
+        }
+        drawCardText(fb, card, y1, "N/A", Theme::TEXT_LABEL);
+        drawCardText(fb, card, y2, reason, Theme::TEXT_FAINT);
+    }
     
     int cardGap() const { return cardGap_; }
     
@@ -163,7 +196,7 @@ public:
         : fb_(fb), health_(std::move(health)), chrome_(chrome) {}
     
     void addPage(std::shared_ptr<ScreenBase> page) {
-        page->setCardGap(chrome_.cardGap);
+        page->setChrome(chrome_);
         pages_.push_back(std::move(page));
     }
     size_t pageCount() const { return pages_.size(); }

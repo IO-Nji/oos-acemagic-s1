@@ -78,6 +78,8 @@ private:
         int cy = top + 34;
         
         if (temp <= 0) {
+            // Nothing beside the ring, so it follows the device's alignment
+            cx = contentLeft(r, GAUGE_R * 2) + GAUGE_R;
             fb.drawRingGauge(cx, cy, GAUGE_R, GAUGE_R - 4, 0, Theme::TRACK, Theme::TRACK);
             fb.drawTextCentered(cx, cy - 4, "N/A", Theme::TEXT_LABEL);
             return;
@@ -106,8 +108,7 @@ private:
         
         if (data.fans.empty()) {
             // The S1 does not expose its fan to the operating system
-            fb.drawText(x, listY, "N/A", Theme::TEXT_LABEL);
-            fb.drawText(x, listY + LIST_PITCH, "No sensor", Theme::TEXT_FAINT);
+            drawUnavailable(fb, r, listY, listY + LIST_PITCH, "No sensor");
             return;
         }
         
@@ -136,8 +137,7 @@ private:
         int top = drawSectionHeader(fb, x, r.y + 5, innerW, "POWER");
         
         if (data.totalPowerW <= 0) {
-            fb.drawText(x, top, "N/A", Theme::TEXT_LABEL);
-            fb.drawText(x, top + LIST_PITCH, "No sensor", Theme::TEXT_FAINT);
+            drawUnavailable(fb, r, top, top + LIST_PITCH, "No sensor");
             return;
         }
         

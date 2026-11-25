@@ -64,6 +64,7 @@ struct Chrome {
     int margin = Layout::INSET;           // display edge to content
     int barGap = 2;                       // header and footer to the page area
     int cardGap = Layout::CARD_GAP;       // between cards on a page
+    bool centerCards = false;             // centre a card's content instead of starting at its left edge
     
     constexpr Rect header() const {
         return Rect(margin, margin, width - 2 * margin, Layout::HEADER_HEIGHT);

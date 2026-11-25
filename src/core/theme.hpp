@@ -8,8 +8,8 @@
 // no alpha channel.
 //
 // A device whose panel shows little contrast (small SPI displays) can build with
-// OOS_THEME_HIGH_CONTRAST: a near-black background, darker cards, brighter text
-// and stronger outlines. The accent and state colours are the same in both.
+// OOS_THEME_HIGH_CONTRAST: a near-black blue background, darker cards, near-white
+// text and stronger outlines. The accent and state colours are the same in both.
 namespace Theme {
     // Base palette, 0xRRGGBB
     constexpr uint32_t P_ACCENT  = 0x0BF5F8;
@@ -22,10 +22,10 @@ namespace Theme {
     constexpr uint32_t P_INFO    = 0x0795F7;
 
 #ifdef OOS_THEME_HIGH_CONTRAST
-    constexpr uint32_t P_BG      = 0x000406;
-    constexpr uint32_t P_TEXT    = 0xF4F6F7;   // names and plain text
-    constexpr uint32_t P_LABEL   = 0xC8D3D8;   // labels and secondary text
-    constexpr uint32_t P_DIM     = 0xDDE8EC;   // secondary readings
+    constexpr uint32_t P_BG      = 0x000410;   // the darkest blue the panel can show that is not black
+    constexpr uint32_t P_TEXT    = 0xFFFFFF;   // names and plain text
+    constexpr uint32_t P_LABEL   = 0xE4ECF2;   // labels and secondary text
+    constexpr uint32_t P_DIM     = 0xEEF4F8;   // secondary readings
     constexpr int SURFACE_TINT = 6;            // percent of accent in a card's fill
     constexpr int OUTLINE_TINT = 55;           // percent of accent in card outlines and rules
     constexpr int FRAME_TINT   = 75;
