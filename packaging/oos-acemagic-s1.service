@@ -1,0 +1,19 @@
+[Unit]
+Description=oOS dashboard for the Acemagic S1 front panel
+Documentation=https://github.com/IO-Nji/oos-acemagic-s1
+# Keep retrying for as long as it takes, for example while the panel is unplugged
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/oos-acemagic-s1
+Restart=always
+RestartSec=5
+# Root is needed for the CPU power counters and the Docker socket; limit the rest
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
