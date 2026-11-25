@@ -42,17 +42,20 @@ public:
         slow_.add(providers_.services, 10s);
         fast_.start();
         slow_.start();
+        if (providers_.mqttEnabled) providers_.mqtt->start();
     }
     
     void stopCollectors() {
         fast_.stop();
         slow_.stop();
+        providers_.mqtt->stop();
     }
     
     // Draw the current page from the latest data
     void renderFrame() {
         *health_ = health::evaluate(providers_.system->data(), providers_.sensors->data(),
-                                    providers_.docker->data(), providers_.services->data());
+                                    providers_.docker->data(), providers_.services->data(),
+                                    providers_.mqttEnabled && providers_.mqtt->data().state == MqttData::State::Offline);
         screens_.update();
         screens_.render();
     }

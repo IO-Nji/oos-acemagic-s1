@@ -13,6 +13,12 @@ struct Config {
                                          "postgresql", "redis", "mosquitto"};
     std::string diskPath = "/";
     
+    // MQTT page: the broker to watch and the topic filters whose messages are listed
+    std::string mqttHost = "127.0.0.1";
+    int mqttPort = 1883;
+    std::string mqttUser, mqttPassword;
+    std::vector<std::string> mqttTopics = {"#"};
+    
     // Settings that belong to one device rather than to the dashboard (a display
     // device path, for example). Name them in deviceKeys and they are collected here
     // as text for the device code to interpret.

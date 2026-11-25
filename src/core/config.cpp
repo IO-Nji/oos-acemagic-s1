@@ -1,5 +1,6 @@
 #include "core/config.hpp"
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <sstream>
 
@@ -8,6 +9,21 @@ static std::string trim(const std::string& s) {
     if (a == std::string::npos) return "";
     size_t b = s.find_last_not_of(" \t\r\n");
     return s.substr(a, b - a + 1);
+}
+
+// A comment starts with '#' at the beginning of the line or standing alone between
+// spaces. A '#' inside a value, such as the MQTT wildcard in "sensors/#" or a lone
+// "#" at the end of the line, is kept.
+static std::string stripComment(const std::string& line) {
+    size_t first = line.find_first_not_of(" \t");
+    if (first != std::string::npos && line[first] == '#') return "";
+    for (size_t i = 1; i + 1 < line.size(); i++) {
+        if (line[i] == '#' && std::isspace(static_cast<unsigned char>(line[i - 1])) &&
+            std::isspace(static_cast<unsigned char>(line[i + 1]))) {
+            return line.substr(0, i);
+        }
+    }
+    return line;
 }
 
 static std::vector<std::string> splitList(const std::string& value) {
@@ -22,15 +38,15 @@ static std::vector<std::string> splitList(const std::string& value) {
 }
 
 void Config::apply(const std::string& text, std::vector<std::string>& warnings) {
-    static const std::vector<std::string> knownPages = {"system", "network", "sensors",
-                                                        "docker", "services", "identity"};
+    static const std::vector<std::string> knownPages = {"system", "network", "sensors", "docker",
+                                                        "services", "mqtt", "identity"};
     std::istringstream stream(text);
     std::string line;
     int lineNo = 0;
     
     while (std::getline(stream, line)) {
         lineNo++;
-        line = trim(line.substr(0, line.find('#')));
+        line = trim(stripComment(line));
         if (line.empty()) continue;
         
         std::string where = "line " + std::to_string(lineNo) + ": ";
@@ -72,6 +88,25 @@ void Config::apply(const std::string& text, std::vector<std::string>& warnings) 
             } else {
                 diskPath = value;
             }
+        } else if (key == "mqtt_host") {
+            if (value.empty()) warnings.push_back(where + "mqtt_host needs a host name or address");
+            else mqttHost = value;
+        } else if (key == "mqtt_port") {
+            char* end = nullptr;
+            long n = std::strtol(value.c_str(), &end, 10);
+            if (value.empty() || *end != '\0' || n < 1 || n > 65535) {
+                warnings.push_back(where + "mqtt_port must be 1 to 65535");
+            } else {
+                mqttPort = static_cast<int>(n);
+            }
+        } else if (key == "mqtt_user") {
+            mqttUser = value;
+        } else if (key == "mqtt_password") {
+            mqttPassword = value;
+        } else if (key == "mqtt_topics") {
+            std::vector<std::string> list = splitList(value);
+            if (list.empty()) warnings.push_back(where + "mqtt_topics needs at least one topic filter");
+            else mqttTopics = list;
         } else if (deviceKeys.count(key)) {
             deviceSettings[key] = value;
         } else {

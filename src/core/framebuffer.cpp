@@ -341,3 +341,17 @@ std::string Framebuffer::fitText(const std::string& str, int maxWidth, Font font
     }
     return s.empty() ? s : s + "..";
 }
+
+std::string Framebuffer::fitTextMiddle(const std::string& str, int maxWidth, Font font) const {
+    if (textWidth(str, font) <= maxWidth) return str;
+    // Drop characters from just before the middle outwards, keeping more of the end
+    size_t head = str.size() * 2 / 5, tail = str.size() - head;
+    while (head + tail > 0) {
+        std::string s = str.substr(0, head) + ".." + str.substr(str.size() - tail);
+        if (textWidth(s, font) <= maxWidth) return s;
+        if (head * 3 >= tail * 2 && head > 0) head--;
+        else if (tail > 0) tail--;
+        else head--;
+    }
+    return "";
+}

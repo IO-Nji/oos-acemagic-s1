@@ -2,12 +2,14 @@
 #include "core/config.hpp"
 #include "data/providers/docker_provider.hpp"
 #include "data/providers/identity_provider.hpp"
+#include "data/providers/mqtt_monitor.hpp"
 #include "data/providers/network_provider.hpp"
 #include "data/providers/sensors_provider.hpp"
 #include "data/providers/services_provider.hpp"
 #include "data/providers/system_provider.hpp"
 #include "ui/screens/docker_screen.hpp"
 #include "ui/screens/identity_screen.hpp"
+#include "ui/screens/mqtt_screen.hpp"
 #include "ui/screens/network_screen.hpp"
 #include "ui/screens/sensors_screen.hpp"
 #include "ui/screens/services_screen.hpp"
@@ -23,6 +25,8 @@ struct Providers {
     std::shared_ptr<DockerDataProvider> docker;
     std::shared_ptr<ServicesDataProvider> services;
     std::shared_ptr<IdentityDataProvider> identity;
+    std::shared_ptr<MqttMonitor> mqtt;       // connects only when the MQTT page is shown
+    bool mqttEnabled = false;
     
     explicit Providers(const Config& config)
         : system(std::make_shared<SystemDataProvider>(config.diskPath)),
@@ -30,7 +34,10 @@ struct Providers {
           sensors(std::make_shared<SensorsDataProvider>()),
           docker(std::make_shared<DockerDataProvider>()),
           services(std::make_shared<ServicesDataProvider>(config.services)),
-          identity(std::make_shared<IdentityDataProvider>()) {}
+          identity(std::make_shared<IdentityDataProvider>()),
+          mqtt(std::make_shared<MqttMonitor>(config)) {
+        for (const auto& page : config.pages) mqttEnabled = mqttEnabled || page == "mqtt";
+    }
 };
 
 // Add the pages named in config.pages, in that order
@@ -42,6 +49,7 @@ inline void addPages(ScreenManager& screens, const Config& config, const Provide
         else if (name == "sensors") screens.addPage(std::make_shared<SensorsScreen>(p.sensors));
         else if (name == "docker") screens.addPage(std::make_shared<DockerScreen>(p.docker));
         else if (name == "services") screens.addPage(std::make_shared<ServicesScreen>(p.services));
+        else if (name == "mqtt") screens.addPage(std::make_shared<MqttScreen>(p.mqtt));
         else if (name == "identity") screens.addPage(std::make_shared<IdentityScreen>(p.identity, health));
     }
 }

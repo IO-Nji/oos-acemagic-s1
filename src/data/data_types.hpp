@@ -112,6 +112,32 @@ struct SensorsData {
     bool underVoltage = false; // supply voltage too low right now (Raspberry Pi)
 };
 
+struct MqttMessage {
+    std::string topic;
+    std::string payload;       // printable text, control characters replaced
+    bool retained = false;
+};
+
+struct MqttData {
+    enum class State { Idle, Connecting, Online, Offline };
+    State state = State::Idle; // Offline: the broker refused or dropped the connection
+    std::string broker;        // host:port
+    
+    // From the broker's $SYS topics; -1 until the broker has reported them
+    std::string version;
+    int clientsConnected = -1;
+    int clientsTotal = -1;
+    int subscriptions = -1;
+    float receivedPerMin = -1;
+    float sentPerMin = -1;
+    long uptimeSeconds = -1;
+    
+    // What was seen on the subscribed topics
+    std::vector<MqttMessage> recent;   // oldest first
+    uint64_t messageCount = 0;
+    int topicCount = 0;
+};
+
 struct IdentityData {
     std::string hostname;
     std::string osName;

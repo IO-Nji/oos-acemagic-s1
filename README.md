@@ -18,6 +18,8 @@ It runs as a small systemd service and shows six rotating pages on the built-in
   unhealthy first, then the busiest
 - **Services**: state of the systemd units you choose
 - **Identity**: hostname, clock, OS, kernel, uptime, login sessions and alerts
+- **MQTT** (optional): for machines that run or use an MQTT broker — connected
+  clients, message rates, broker uptime, and a running log of messages by topic
 
 The footer of every page shows the machine's health: `OK`, or the most serious
 alert and how many more there are.
@@ -86,7 +88,19 @@ services = ssh, docker, nginx, apache2, mysql, mariadb, postgresql, redis, mosqu
 
 # Filesystem shown in the DISK card and watched for the disk alert
 disk = /
+
+# MQTT page: add "mqtt" to pages to show it
+mqtt_host = 127.0.0.1
+mqtt_port = 1883
+#mqtt_user =
+#mqtt_password =
+mqtt_topics = #        # topic filters to list, comma separated
 ```
+
+The MQTT page connects to the broker as a read-only client, subscribes to
+`mqtt_topics` and to the broker's `$SYS` statistics, and reconnects on its own.
+If the broker needs a login, note that the settings file is readable by every
+user unless you restrict it (`sudo chmod 600 /etc/oos-acemagic-s1/config.conf`).
 
 Every line is optional. A mistake in the file is reported in the journal and the
 affected setting keeps its default; the service still starts.
@@ -95,6 +109,7 @@ affected setting keeps its default; the service still starts.
 
 | Footer text | Raised when | Level |
 | --- | --- | --- |
+| `MQTT OFFLINE` | the MQTT page is enabled and its broker cannot be reached | critical |
 | `n SVC FAILED` | a watched systemd unit is in the failed state | critical |
 | `DISK nn%` | the watched filesystem is 90 % full (97 %: critical) | warning |
 | `CPU nnC` | the CPU package reaches 85 C (95 C: critical) | warning |

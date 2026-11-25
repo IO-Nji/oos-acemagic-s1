@@ -17,6 +17,7 @@ struct Set {
     ServicesData services;
     IdentityData identity;
     SensorsData sensors;
+    MqttData mqtt;
 };
 
 inline NetworkInterfaceData iface(const char* name, const char* ip, bool up,
@@ -96,6 +97,28 @@ inline Set typical() {
     s.sensors.totalPowerW = 7.8f;
     s.sensors.tdpW = 12.0f;
 
+    s.mqtt.state = MqttData::State::Online;
+    s.mqtt.broker = "127.0.0.1:1883";
+    s.mqtt.version = "2.0.18";
+    s.mqtt.clientsConnected = 5;
+    s.mqtt.clientsTotal = 7;
+    s.mqtt.subscriptions = 12;
+    s.mqtt.receivedPerMin = 42.6f;
+    s.mqtt.sentPerMin = 118.0f;
+    s.mqtt.uptimeSeconds = 18 * 86400 + 9 * 3600;
+    s.mqtt.recent = {
+        {"home/kitchen/temperature", "21.4", false},
+        {"home/kitchen/humidity", "48", false},
+        {"home/door/front", "closed", true},
+        {"sensors/garage/state", "{\"motion\":false,\"lux\":12}", false},
+        {"home/livingroom/temperature", "22.1", false},
+        {"plugs/desk/power", "63.5", false},
+        {"home/kitchen/temperature", "21.5", false},
+        {"sensors/garden/soil", "{\"moisture\":37,\"battery\":91}", false},
+    };
+    s.mqtt.messageCount = 15234;
+    s.mqtt.topicCount = 23;
+
     finish(s);
     return s;
 }
@@ -170,6 +193,22 @@ inline Set stress() {
     s.sensors.totalPowerW = 188.8f;
     s.sensors.tdpW = 12.0f;
     s.sensors.underVoltage = true;
+
+    s.mqtt.state = MqttData::State::Online;
+    s.mqtt.broker = "broker.example.com:8883";
+    s.mqtt.version = "2.0.18";
+    s.mqtt.clientsConnected = 8888;
+    s.mqtt.clientsTotal = 88888;
+    s.mqtt.receivedPerMin = 88888.0f;
+    s.mqtt.sentPerMin = 88888.0f;
+    s.mqtt.uptimeSeconds = 888L * 86400 + 23 * 3600;
+    for (int i = 0; i < 12; i++) {
+        s.mqtt.recent.push_back({"building/floor-" + std::to_string(i) + "/room/sensor/temperature/celsius",
+                                 "{\"value\":88.88,\"unit\":\"C\",\"battery\":100,\"rssi\":-88}", i % 3 == 0});
+    }
+    s.mqtt.recent.push_back({"short", "", false});
+    s.mqtt.messageCount = 888888888;
+    s.mqtt.topicCount = 2000;
     s.network.interfaces[1].signalDbm = -100;
 
     finish(s);

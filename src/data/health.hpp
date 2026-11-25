@@ -30,10 +30,15 @@ namespace health {
         return buf;
     }
     
+    // mqttOffline: the MQTT page is in use and its broker cannot be reached
     inline Health evaluate(const SystemData& system, const SensorsData& sensors,
-                           const DockerData& docker, const ServicesData& services) {
+                           const DockerData& docker, const ServicesData& services,
+                           bool mqttOffline = false) {
         std::vector<std::string> critical, warning;
         
+        if (mqttOffline) {
+            critical.push_back("MQTT OFFLINE");
+        }
         if (services.failedCount > 0) {
             critical.push_back(std::to_string(services.failedCount) + " SVC FAILED");
         }

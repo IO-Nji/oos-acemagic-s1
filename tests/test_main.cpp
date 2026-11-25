@@ -5,6 +5,7 @@
 #include "data/health.hpp"
 #include "data/providers/docker_provider.hpp"
 #include "data/providers/identity_provider.hpp"
+#include "data/providers/mqtt_monitor.hpp"
 #include "data/providers/network_provider.hpp"
 #include "data/providers/services_provider.hpp"
 
@@ -120,6 +121,18 @@ static void testConfig() {
     CHECK(c.services == (std::vector<std::string>{"ssh", "cron"}));
     CHECK(c.diskPath == "/srv");
     
+    // '#' starts a comment only at the start of a line or alone between spaces
+    Config m;
+    m.apply("mqtt_topics = #\n", w);
+    CHECK(m.mqttTopics == (std::vector<std::string>{"#"}));
+    m.apply("mqtt_topics = home/#, sensors/+/state   # the ones that matter\nmqtt_port = 8883\npages = mqtt\n", w);
+    CHECK(m.mqttTopics == (std::vector<std::string>{"home/#", "sensors/+/state"}));
+    CHECK(m.mqttPort == 8883 && m.pages == (std::vector<std::string>{"mqtt"}));
+    CHECK(w.empty());
+    m.apply("mqtt_port = 99999\n", w);
+    CHECK(w.size() == 1 && m.mqttPort == 8883);
+    w.clear();
+    
     // Bad values are reported and leave the setting alone
     c.apply("page_interval = fast\npages = nope\ndisk = relative\ncolour = red\nno equals sign\n", w);
     CHECK(w.size() == 6);   // "pages" reports the unknown name and the empty result
@@ -164,6 +177,72 @@ static void testHealth() {
     sensors.underVoltage = true;
     h = health::evaluate(sys, sensors, docker, services);
     CHECK(h.alerts.size() == 5);
+    
+    h = health::evaluate(SystemData(), SensorsData(), DockerData(), ServicesData(), true);
+    CHECK(h.level == Health::Level::Critical && h.summary() == "MQTT OFFLINE");
+}
+
+static void testMqtt() {
+    // CONNECT: fixed header, protocol name and level, clean session, keep-alive, client id
+    auto connect = mqtt::connectPacket("abc", "", "", 60);
+    const std::vector<uint8_t> expected = {0x10, 15, 0, 4, 'M', 'Q', 'T', 'T', 4, 0x02, 0, 60, 0, 3, 'a', 'b', 'c'};
+    CHECK(connect == expected);
+    auto withLogin = mqtt::connectPacket("abc", "user", "pw", 60);
+    CHECK(withLogin[9] == 0xC2 && withLogin.size() == expected.size() + 6 + 4);
+    
+    auto subscribe = mqtt::subscribePacket(1, {"#", "$SYS/broker/#"});
+    CHECK(subscribe[0] == 0x82 && subscribe[1] == subscribe.size() - 2);
+    CHECK(subscribe[2] == 0 && subscribe[3] == 1 && subscribe[6] == '#' && subscribe[7] == 0);
+    
+    // A stream with a CONNACK, a retained PUBLISH, a QoS 1 PUBLISH and one longer
+    // than 127 bytes, delivered one byte at a time
+    std::vector<uint8_t> stream = {0x20, 2, 0, 0};
+    auto publish = [&](uint8_t flags, const std::string& topic, const std::string& payload) {
+        std::vector<uint8_t> body = {static_cast<uint8_t>(topic.size() >> 8), static_cast<uint8_t>(topic.size())};
+        body.insert(body.end(), topic.begin(), topic.end());
+        if (flags & 0x06) { body.push_back(0); body.push_back(7); }
+        body.insert(body.end(), payload.begin(), payload.end());
+        auto packet = mqtt::detail::frame(0x30 | flags, body);
+        stream.insert(stream.end(), packet.begin(), packet.end());
+    };
+    publish(0x01, "a/b", "on");
+    publish(0x02, "c", "qos1");
+    publish(0x00, "big", std::string(1000, 'x'));
+    
+    mqtt::Parser parser;
+    std::vector<mqtt::Packet> got;
+    for (uint8_t b : stream) parser.feed(&b, 1, [&](const mqtt::Packet& p) { got.push_back(p); });
+    CHECK(got.size() == 4);
+    CHECK(got[0].type == mqtt::CONNACK && got[0].returnCode == 0);
+    CHECK(got[1].topic == "a/b" && got[1].payload == "on" && got[1].retained);
+    CHECK(got[2].topic == "c" && got[2].payload == "qos1" && !got[2].retained);
+    CHECK(got[3].topic == "big" && got[3].payload.size() == mqtt::Parser::MAX_PAYLOAD);
+    
+    // The monitor sorts broker statistics from ordinary messages
+    MqttMonitor monitor{Config()};
+    auto deliver = [&](const std::string& topic, const std::string& payload) {
+        mqtt::Packet p;
+        p.type = mqtt::PUBLISH;
+        p.topic = topic;
+        p.payload = payload;
+        monitor.handlePublish(p);
+    };
+    deliver("$SYS/broker/version", "mosquitto version 2.0.11");
+    deliver("$SYS/broker/clients/connected", "3");
+    deliver("$SYS/broker/uptime", "7200 seconds");
+    deliver("$SYS/broker/load/messages/received/1min", "12.50");
+    deliver("room/temp", "21.5\n");
+    deliver("room/temp", "21.6");
+    deliver("room/raw", std::string("a\x01\tb"));
+    MqttData d = monitor.data();
+    CHECK(d.version == "2.0.11" && d.clientsConnected == 3 && d.uptimeSeconds == 7200);
+    CHECK(d.receivedPerMin == 12.5f && d.clientsTotal == -1);
+    CHECK(d.recent.size() == 3 && d.messageCount == 3 && d.topicCount == 2);
+    CHECK(d.recent[0].payload == "21.5" && d.recent[2].payload == "a? b");
+    
+    for (int i = 0; i < 100; i++) deliver("flood", std::to_string(i));
+    d = monitor.data();
+    CHECK(d.recent.size() == MqttMonitor::RECENT_MESSAGES && d.recent.back().payload == "99");
 }
 
 static void testMisc() {
@@ -183,6 +262,7 @@ int main() {
     testServices();
     testConfig();
     testHealth();
+    testMqtt();
     testMisc();
     if (failures) {
         std::cerr << failures << " check(s) failed\n";

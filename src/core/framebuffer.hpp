@@ -79,6 +79,9 @@ public:
     int textHeight(Font font = Font::Small) const;
     // Shorten str with a trailing ".." until it fits maxWidth
     std::string fitText(const std::string& str, int maxWidth, Font font = Font::Small) const;
+    // The same, but cutting from the middle, for names whose end matters as much as
+    // their start (paths, topics)
+    std::string fitTextMiddle(const std::string& str, int maxWidth, Font font = Font::Small) const;
     
     // Layout audit: records the box of every drawText call so tools can detect
     // overlapping or out-of-bounds text.

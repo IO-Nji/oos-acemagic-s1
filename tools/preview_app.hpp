@@ -21,9 +21,17 @@
 struct PreviewDevice {
     const char* serviceName;
     DisplayProfile display;
+    std::vector<std::string> pages;              // default pages, if not the dashboard's own
     std::set<std::string> deviceKeys;            // settings the device adds to the config file
     std::function<void(Dashboard&)> overlay;     // device UI drawn over each frame; may be empty
 };
+
+inline Config defaultConfig(const PreviewDevice& device) {
+    Config config = Config::defaultsFor(device.serviceName);
+    if (!device.pages.empty()) config.pages = device.pages;
+    config.deviceKeys = device.deviceKeys;
+    return config;
+}
 
 struct Rig {
     Config config;
@@ -45,6 +53,7 @@ struct Rig {
         p.services->setData(s.services);
         p.identity->setData(s.identity);
         p.sensors->setData(s.sensors);
+        p.mqtt->setData(s.mqtt);
     }
 
     // Feed a waveform through the history graphs, ending on the base values
@@ -168,7 +177,7 @@ inline int checkLayout(const PreviewDevice& device) {
     const int margin = Layout::BORDER_X + Layout::BORDER_WIDTH;
 
     for (const char* setName : {"typical", "stress"}) {
-        Rig rig(Config::defaultsFor(device.serviceName), device);
+        Rig rig(defaultConfig(device), device);
         rig.loadMock(std::strcmp(setName, "stress") == 0 ? mock::stress() : mock::typical());
         const int maxX = rig.fb().width() - margin, maxY = rig.fb().height() - margin;
         for (size_t page = 0; page < rig.pageCount(); page++) {
@@ -235,8 +244,7 @@ inline int runPreview(int argc, char* argv[], const PreviewDevice& device) {
         return 2;
     }
 
-    Config config = Config::defaultsFor(device.serviceName);
-    config.deviceKeys = device.deviceKeys;
+    Config config = defaultConfig(device);
     if (!configPath.empty()) {
         std::vector<std::string> warnings;
         if (!config.load(configPath, warnings)) {
