@@ -11,15 +11,21 @@ static std::string trim(const std::string& s) {
     return s.substr(a, b - a + 1);
 }
 
-// A comment starts with '#' at the beginning of the line or standing alone between
-// spaces. A '#' inside a value, such as the MQTT wildcard in "sensors/#" or a lone
-// "#" at the end of the line, is kept.
+// A comment starts with '#' at the beginning of the line, or standing alone between
+// spaces after the value has begun. A '#' that is part of a value is kept: the MQTT
+// wildcard in "sensors/#", or a value that is just "#".
 static std::string stripComment(const std::string& line) {
     size_t first = line.find_first_not_of(" \t");
-    if (first != std::string::npos && line[first] == '#') return "";
-    for (size_t i = 1; i + 1 < line.size(); i++) {
-        if (line[i] == '#' && std::isspace(static_cast<unsigned char>(line[i - 1])) &&
-            std::isspace(static_cast<unsigned char>(line[i + 1]))) {
+    if (first == std::string::npos || line[first] == '#') return "";
+    
+    // Skip to the second character of the value
+    size_t eq = line.find('=');
+    size_t from = eq == std::string::npos ? first : line.find_first_not_of(" \t", eq + 1);
+    if (from == std::string::npos) return line;
+    
+    for (size_t i = from + 1; i < line.size(); i++) {
+        bool endsWord = i + 1 == line.size() || std::isspace(static_cast<unsigned char>(line[i + 1]));
+        if (line[i] == '#' && std::isspace(static_cast<unsigned char>(line[i - 1])) && endsWord) {
             return line.substr(0, i);
         }
     }

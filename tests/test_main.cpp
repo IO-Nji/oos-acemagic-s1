@@ -125,6 +125,11 @@ static void testConfig() {
     Config m;
     m.apply("mqtt_topics = #\n", w);
     CHECK(m.mqttTopics == (std::vector<std::string>{"#"}));
+    m.mqttTopics.clear();
+    m.apply("mqtt_topics = #        # everything\n", w);
+    CHECK(m.mqttTopics == (std::vector<std::string>{"#"}));
+    m.apply("mqtt_topics = a/# #\n", w);
+    CHECK(m.mqttTopics == (std::vector<std::string>{"a/#"}));
     m.apply("mqtt_topics = home/#, sensors/+/state   # the ones that matter\nmqtt_port = 8883\npages = mqtt\n", w);
     CHECK(m.mqttTopics == (std::vector<std::string>{"home/#", "sensors/+/state"}));
     CHECK(m.mqttPort == 8883 && m.pages == (std::vector<std::string>{"mqtt"}));
