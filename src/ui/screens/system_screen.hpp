@@ -117,7 +117,12 @@ private:
         int statsW = r.right() - CARD_PAD - statsX;
         int statsY = r.y + R1_STAT_Y;
         
-        snprintf(buf, sizeof(buf), "%.1f/%.1fG", mem.usedMB / 1024.0f, mem.totalMB / 1024.0f);
+        // Megabytes on small machines, where gigabytes would read "0.1/0.4G"
+        if (mem.totalMB < 2048) {
+            snprintf(buf, sizeof(buf), "%d/%dM", mem.usedMB, mem.totalMB);
+        } else {
+            snprintf(buf, sizeof(buf), "%.1f/%.1fG", mem.usedMB / 1024.0f, mem.totalMB / 1024.0f);
+        }
         fb.drawText(statsX, statsY, fb.fitText(buf, statsW), Theme::VALUE);
         
         snprintf(buf, sizeof(buf), "C:%dM", mem.cachedMB);
