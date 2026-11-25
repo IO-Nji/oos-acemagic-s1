@@ -1,32 +1,38 @@
 # oos-acemagic-s1
 
 A system dashboard for the front display of the **Acemagic S1** mini PC on Linux.
-It runs as a small systemd service and shows six rotating pages on the built-in
-320x170 panel, styled after the oOS embedded UI (Orbitron type, navy and cyan).
+It runs as a small systemd service and rotates through pages of system information
+on the built-in 320x170 panel, styled after the oOS embedded UI (Orbitron type, navy
+and cyan).
 
-![The six dashboard pages](docs/screenshots/overview.png)
+![The six default dashboard pages](docs/screenshots/overview.png)
 
 *Screenshots are rendered by the bundled preview tool from sample data.*
 
 - **System**: CPU load, frequency, load average and temperature; memory with a
   used / cache / buffers bar; disk use; CPU package power; uptime
-- **Network**: primary address, per-interface speeds, totals since boot, and
-  download / upload history graphs
+- **Network**: primary address, per-interface speeds and Wi-Fi signal, totals since
+  boot, and download / upload history graphs
 - **Sensors**: CPU and SSD (or GPU) temperature gauges with history; power by
   domain; every other temperature sensor
 - **Docker**: running / total counts and the containers that matter most:
   unhealthy first, then the busiest
 - **Services**: state of the systemd units you choose
 - **Identity**: hostname, clock, OS, kernel, uptime, login sessions and alerts
-- **MQTT** (optional): for machines that run or use an MQTT broker — connected
-  clients, message rates, broker uptime, and a running log of messages by topic
+- **MQTT** (optional, off by default): for machines that run or use an MQTT broker —
+  connected clients, message rates, broker uptime, and a running log of messages
+  by topic
 
 The footer of every page shows the machine's health: `OK`, or the most serious
 alert and how many more there are.
 
-| Healthy | With alerts |
-| --- | --- |
-| ![Identity page](docs/screenshots/identity.png) | ![Identity page showing alerts](docs/screenshots/alerts.png) |
+| Healthy | With alerts | MQTT page |
+| --- | --- | --- |
+| ![Identity page](docs/screenshots/identity.png) | ![Identity page showing alerts](docs/screenshots/alerts.png) | ![MQTT page](docs/screenshots/mqtt.png) |
+
+**Other displays.** The same dashboard runs on a Raspberry Pi with a 3.5" SPI touch
+display: [oos-rpi-lcd35](https://github.com/IO-Nji/oos-rpi-lcd35). It uses this
+repository's code and adds touch navigation.
 
 ## Requirements
 
@@ -81,6 +87,7 @@ Edit `/etc/oos-acemagic-s1/config.conf`, then `sudo systemctl restart oos-acemag
 page_interval = 5
 
 # Pages to show, in this order. Leave one out to hide it.
+# Available: system, network, sensors, docker, services, identity, mqtt
 pages = system, network, sensors, docker, services, identity
 
 # systemd units listed on the Services page. Units that do not exist are skipped.
@@ -97,13 +104,26 @@ mqtt_port = 1883
 mqtt_topics = #        # topic filters to list, comma separated
 ```
 
-The MQTT page connects to the broker as a read-only client, subscribes to
-`mqtt_topics` and to the broker's `$SYS` statistics, and reconnects on its own.
-If the broker needs a login, note that the settings file is readable by every
-user unless you restrict it (`sudo chmod 600 /etc/oos-acemagic-s1/config.conf`).
-
 Every line is optional. A mistake in the file is reported in the journal and the
 affected setting keeps its default; the service still starts.
+
+### MQTT page
+
+Add `mqtt` to `pages` to show it. The dashboard connects to the broker as a
+read-only client (it never publishes), subscribes to `mqtt_topics` and to the
+broker's `$SYS` statistics, and reconnects on its own.
+
+- The top card shows connected clients and messages in and out per minute, or
+  `BROKER OFFLINE` with the broker's address.
+- The log lists each message as it arrives, topic then payload, newest at the
+  bottom. Long topics are shortened in the middle so both ends stay readable.
+  Retained messages are drawn in a dimmer colour than live ones.
+- `mqtt_topics` takes MQTT topic filters, comma separated, for example
+  `home/#, sensors/+/state`. The default `#` lists everything.
+
+The client count includes the dashboard itself. If the broker needs a login, note
+that the settings file is readable by every user unless you restrict it
+(`sudo chmod 600 /etc/oos-acemagic-s1/config.conf`).
 
 ## Alerts
 
@@ -147,6 +167,12 @@ The S1 does not expose its fan to the operating system.
 **Docker page says "Docker not available".**
 The `docker` command is missing or the daemon is not running.
 
+**MQTT page says "BROKER OFFLINE".**
+Nothing accepted the connection at `mqtt_host`:`mqtt_port`, or the broker refused the
+login. Try `mosquitto_sub -h HOST -p PORT -t '$SYS/broker/version' -C 1` from the
+same machine. If client counts and rates stay empty, the broker does not publish
+`$SYS` statistics.
+
 **A page change wipes down the screen.**
 The panel's USB link moves 64 bytes per millisecond, so a full repaint takes about two
 seconds. Small changes (the clock, a value) take a fraction of that. See
@@ -158,9 +184,9 @@ seconds. Small changes (the clock, a value) take a fraction of that. See
 src/core   drawing, Orbitron glyphs, theme, settings, changed-region tracking
 src/app    the dashboard assembled from the parts below, without any hardware
 src/hw     USB device and the panel transport
-src/data   providers (system, network, sensors, docker, services, identity),
-           background collection, health evaluation
-src/ui     page frame and the six pages
+src/data   providers (system, network, sensors, docker, services, identity), the
+           MQTT monitor, background collection, health evaluation
+src/ui     page frame and the pages
 tools      offline preview renderer, font baking script
 tests      unit tests
 ```
@@ -173,9 +199,10 @@ tests      unit tests
   several seconds after each one; the details are in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 - The service uses about 1.5 % of one core and under 15 MB of memory, including the
   `docker` and `systemctl` commands it runs.
+- The MQTT page uses a small built-in MQTT 3.1.1 client, so there is nothing extra
+  to install.
 - Pages are laid out once, in units of the S1's 320x170 panel. Everything except
-  `src/hw` and `src/main.cpp` is device-independent, so another display can reuse it
-  at a different scale by adding this repository as a subdirectory and linking `oos_core`.
+  `src/hw` and `src/main.cpp` is device-independent; see "Other devices" below.
 - It runs as root (needed for the power counters and the Docker socket) with
   `NoNewPrivileges`, a read-only system and home, and a private `/tmp`.
 
@@ -207,6 +234,24 @@ Changing the look:
   [Orbitron](https://fonts.google.com/specimen/Orbitron) static TTFs, then run
   `python3 tools/bake_fonts.py path/to/Orbitron/static` (needs Pillow) to regenerate
   `src/core/font_orbitron.cpp`.
+
+## Other devices
+
+Another display can reuse everything except `src/hw` and `src/main.cpp` by adding
+this repository as a subdirectory (or git submodule) and linking `oos_core`.
+[oos-rpi-lcd35](https://github.com/IO-Nji/oos-rpi-lcd35) is a complete example. A
+device chooses:
+
+- its **scale** (`UiScale`): fonts are baked for 100 % and 150 %; add a scale in
+  `tools/bake_fonts.py`,
+- its **layout** (`Chrome` in `src/core/layout.hpp`): framed or not, margins, the gap
+  between cards, and whether card content is centred,
+- its **palette**: build with `OOS_THEME_HIGH_CONTRAST` for panels with little
+  contrast,
+- and supplies its own output, input and `main()`. `tools/preview_app.hpp` gives it
+  the same preview tool and layout checks.
+
+The defaults are the S1, whose output these options do not change.
 
 ## Credits and licence
 

@@ -61,6 +61,7 @@ inline Set typical() {
         iface("wlp1s0", "192.168.1.21", true, 2048, 912, 3456789012ull, 987654321ull),
         iface("wg0", "10.0.0.1", true, 0, 0, 123456789ull, 23456789ull),
     };
+    s.network.interfaces[1].signalDbm = -58;
 
     s.docker = DockerDataProvider::parse(
         "a1|nextcloud|nextcloud:29-apache|Up 2 weeks (healthy)|running\n"
